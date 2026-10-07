@@ -6,6 +6,7 @@ import {
   subscribeShutdown,
 } from "./infrastructure/lifecycle/shutdown.js";
 import { createApp } from "./app.js";
+import { dbConnection } from "./infrastructure/persistence/db.js";
 
 class AppServer {
   private static instance: AppServer;
@@ -27,6 +28,7 @@ class AppServer {
 
   public async start(): Promise<void> {
     try {
+      await dbConnection();
       const app = createApp();
       this.server = app.listen(config.port, () => {
         logger.info(
