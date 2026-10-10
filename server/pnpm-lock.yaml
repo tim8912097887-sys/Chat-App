@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      bcrypt-ts:
+        specifier: ^9.0.2
+        version: 9.0.2
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -408,6 +411,10 @@ packages:
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
+
+  bcrypt-ts@9.0.2:
+    resolution: {integrity: sha512-esaMayGbxzD3bOpy7f00pa5wA15wqhP15RbDYGzh/xGbZRNr05G9HdNiqK4ywzrVdzO8rv+Z4l6m01/9pv1FRA==}
+    engines: {node: '>=22'}
 
   body-parser@2.3.0:
     resolution: {integrity: sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw==}
@@ -1406,6 +1413,8 @@ snapshots:
   atomic-sleep@1.0.0: {}
 
   balanced-match@4.0.4: {}
+
+  bcrypt-ts@9.0.2: {}
 
   body-parser@2.3.0:
     dependencies:
