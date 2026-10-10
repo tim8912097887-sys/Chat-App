@@ -3,11 +3,14 @@ import cors from "cors";
 import express from "express";
 import type { Express } from "express";
 import helmet from "helmet";
-import { config } from "./config/env/index.js";
 import { successResponse } from "./shared/http/success.js";
 import { corsConfig } from "./config/cors/cors.js";
+import { notFoundHandler } from "./infrastructure/http/middleware/not-found-handler.js";
+import { errorHandler } from "./infrastructure/http/middleware/error-handler.js";
+import { AppContainer } from "./container.js";
+import { createAuthRouter } from "./domain/auth/auth.route.js";
 
-export const createApp = (): Express => {
+export const createApp = (container: AppContainer): Express => {
   const app = express();
 
   app.use(helmet());
@@ -18,6 +21,18 @@ export const createApp = (): Express => {
   app.get("/health", (_req, res) => {
     res.json(successResponse({ uptime: process.uptime() }));
   });
+
+  // Routes
+  app.use(
+    "/api/v1/auth",
+    createAuthRouter({
+      controller: container.auth.authController,
+      refreshTokenMiddleware: container.auth.refreshTokenMiddleware,
+    }),
+  );
+
+  app.use(errorHandler);
+  app.use(notFoundHandler);
 
   return app;
 };

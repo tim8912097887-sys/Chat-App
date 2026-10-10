@@ -7,6 +7,7 @@ import {
 } from "./infrastructure/lifecycle/shutdown.js";
 import { createApp } from "./app.js";
 import { dbConnection } from "./infrastructure/persistence/db.js";
+import { buildContainer } from "./container.js";
 
 class AppServer {
   private static instance: AppServer;
@@ -29,7 +30,8 @@ class AppServer {
   public async start(): Promise<void> {
     try {
       await dbConnection();
-      const app = createApp();
+      const container = buildContainer();
+      const app = createApp(container);
       this.server = app.listen(config.port, () => {
         logger.info(
           `Server initialization: Server start on port ${config.port}`,

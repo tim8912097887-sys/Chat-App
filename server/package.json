@@ -24,6 +24,7 @@
     "typescript-eslint": "^8.71.1"
   },
   "dependencies": {
+    "bcrypt-ts": "^9.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "express": "^5.2.1",
