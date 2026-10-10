@@ -1,0 +1,1150 @@
+{
+  "info": {
+    "_postman_id": "a5d89af2-18be-49ae-a795-2fd1809a6eaa",
+    "name": "Chat App Auth API - Newman Edge Cases",
+    "description": "Sequential auth endpoint tests based on the supplied implementation. Run against a disposable test database. Note: the source does not reveal configured maxLoginAttempts, lockDurationMs, refresh cookie name, or error status constants; adjust the environment/cookie names and lockout requests to match your configuration. Cookie assertions assume refresh_token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Signup succeeds",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Newman Test User\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "pm.test(\"signup message\",()=>pm.expect(b.data.message).eql(\"Signed up\"));"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "02 Duplicate signup (current code still returns success)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Duplicate Name\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "pm.expect(b.data.message).eql(\"Signed up\");"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "03 Signup empty body",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "04 Signup invalid email/password/image URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Valid Name\",\n  \"email\": \"bad\",\n  \"password\": \"short\",\n  \"imageUrl\": \"javascript:alert(1)\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "05 Signup name too short",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"A\",\n  \"email\": \"short-name@example.test\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "06 Signup name too long",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{longName}}\",\n  \"email\": \"long-name@example.test\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "07 Signup email too long",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Valid Name\",\n  \"email\": \"{{longEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "08 Signup password over 72 chars",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Valid Name\",\n  \"email\": \"long-password@example.test\",\n  \"password\": \"{{longPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "09 Login succeeds",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "",
+              "pm.test(\"token fields\",()=>{pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;pm.expect(b.data.refreshToken).to.be.a(\"string\").and.not.empty;});",
+              "pm.test(\"HttpOnly refresh cookie\",()=>{const c=pm.response.headers.get(\"Set-Cookie\")||\"\";pm.expect(c).to.include(\"refresh_token=\");pm.expect(c.toLowerCase()).to.include(\"httponly\");});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "10 Login normalized email",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"  {{testEmailUpper}}  \",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "11 Login nonexistent email",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{nonexistentEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"invalid credentials status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "12 Login wrong password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{wrongPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"invalid credentials status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "13 Login invalid email",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "14 Login missing password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "15 Login password too short",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"short\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "16 Login password over 72 chars",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{longPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"validation status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "17 Refresh succeeds",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "refresh"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "",
+              "pm.test(\"refresh returns tokens\",()=>{pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;pm.expect(b.data.refreshToken).to.be.a(\"string\").and.not.empty;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "18 Refresh malformed token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "refresh_token=not-a-valid-token"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "refresh"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"authentication status\",()=>{pm.expect(pm.response.code).to.be.oneOf([401]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "19 Logout succeeds",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "logout"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "pm.expect(b.data.message).eql(\"Logged out\");"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "20 Logout malformed token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "refresh_token=not-a-valid-token"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "logout"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"authentication status\",()=>{pm.expect(pm.response.code).to.be.oneOf([401]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "21 Login again before logout-all",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "",
+              "pm.test(\"save refresh token for revocation test\",()=>{pm.expect(b.data.refreshToken).to.be.a(\"string\");pm.environment.set(\"preLogoutAllRefreshToken\",b.data.refreshToken);});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "22 Logout all succeeds",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "logout-all"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
+              "pm.expect(b.data.message).eql(\"Logged out all sessions\");"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "23 Old refresh token rejected after logout-all",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "refresh_token={{preLogoutAllRefreshToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "refresh"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"revoked token status\",()=>{pm.expect(pm.response.code).to.be.oneOf([401]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "24 Logout-all malformed token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "refresh_token=not-a-valid-token"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "logout-all"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"authentication status\",()=>{pm.expect(pm.response.code).to.be.oneOf([401]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "25 Signup lockout test user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Lockout Test User\",\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "26 Lockout account wrong password attempt 1",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{wrongPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"failed login status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "27 Lockout account wrong password attempt 2",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{wrongPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"failed login / lockout status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400,409]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "28 Lockout account wrong password attempt 3",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{wrongPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"failed login / lockout status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400,409]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "29 Login while locked (requires attempt threshold reached)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"locked account status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400,409]);});",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "testEmail",
+      "value": "newman-auth@example.test"
+    },
+    {
+      "key": "testEmailUpper",
+      "value": "NEWMAN-AUTH@EXAMPLE.TEST"
+    },
+    {
+      "key": "testPassword",
+      "value": "ValidPassw0rd!"
+    },
+    {
+      "key": "wrongPassword",
+      "value": "WrongPassw0rd!"
+    },
+    {
+      "key": "nonexistentEmail",
+      "value": "missing-user@example.test"
+    },
+    {
+      "key": "lockoutEmail",
+      "value": "newman-lockout@example.test"
+    },
+    {
+      "key": "longName",
+      "value": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"
+    },
+    {
+      "key": "longEmail",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com"
+    },
+    {
+      "key": "longPassword",
+      "value": "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+    },
+    {
+      "key": "preLogoutAllRefreshToken",
+      "value": ""
+    }
+  ]
+}
