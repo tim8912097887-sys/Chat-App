@@ -7,6 +7,10 @@ export interface TokenPayload {
   tokenVersion: number;
 }
 
+export interface RefreshTokenInput extends TokenPayload {
+  refreshToken: string;
+}
+
 export interface TokenServiceOptions {
   issuer: string;
   accessSecret: string;
@@ -51,11 +55,11 @@ export class JoseTokenService implements TokenService {
     );
   }
 
-  verifyAccessToken(token: string): Promise<TokenPayload | null> {
+  verifyAccessToken(token: string): Promise<RefreshTokenInput | null> {
     return this.verify("access", token, this.accessKey);
   }
 
-  verifyRefreshToken(token: string): Promise<TokenPayload | null> {
+  verifyRefreshToken(token: string): Promise<RefreshTokenInput | null> {
     return this.verify("refresh", token, this.refreshKey);
   }
 
@@ -78,7 +82,7 @@ export class JoseTokenService implements TokenService {
     type: TokenType,
     token: string,
     key: Uint8Array,
-  ): Promise<TokenPayload | null> {
+  ): Promise<RefreshTokenInput | null> {
     try {
       const { payload } = await jwtVerify(token, key, {
         issuer: this.options.issuer,
@@ -87,7 +91,11 @@ export class JoseTokenService implements TokenService {
       if (payload.typ !== type) return null;
       if (typeof payload.sub !== "string" || typeof payload.ver !== "number")
         return null;
-      return { userId: payload.sub, tokenVersion: payload.ver };
+      return {
+        refreshToken: token,
+        userId: payload.sub,
+        tokenVersion: payload.ver,
+      };
     } catch {
       return null;
     }

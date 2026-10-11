@@ -65,26 +65,43 @@ export class MongoUserRepository implements UserRepository {
     id: string,
     options: { maxAttempts: number; lockedAt: Date },
   ): Promise<FailedLoginResult> {
-    const updated = await this.userModel
-      .findOneAndUpdate(
-        { _id: id },
-        { $inc: { login_attempt: 1 } },
-        { new: true },
-      )
-      .lean<UserDocument>()
-      .exec();
+    const session = await this.userModel.db.startSession();
 
-    if (!updated || updated.login_attempt < options.maxAttempts)
-      return { locked: false };
+    try {
+      let isLocked = false;
 
-    // The filter makes the lock + reset a no-op if a concurrent request already did it.
-    await this.userModel
-      .updateOne(
-        { _id: id, login_attempt: { $gte: options.maxAttempts } },
-        { $set: { login_attempt: 0, login_locked_at: options.lockedAt } },
-      )
-      .exec();
-    return { locked: true };
+      await session.withTransaction(async () => {
+        const user = await this.userModel
+          .findById(id)
+          .session(session)
+          .lean<UserDocument>()
+          .exec();
+
+        if (!user) return;
+
+        const newAttempts = (user.login_attempt || 0) + 1;
+
+        if (newAttempts < options.maxAttempts) {
+          await this.userModel.updateOne(
+            { _id: id },
+            { $set: { login_attempt: newAttempts } },
+            { session },
+          );
+          isLocked = false;
+        } else {
+          await this.userModel.updateOne(
+            { _id: id },
+            { $set: { login_attempt: 0, login_locked_at: options.lockedAt } },
+            { session },
+          );
+          isLocked = true;
+        }
+      });
+
+      return { locked: isLocked };
+    } finally {
+      await session.endSession();
+    }
   }
 
   async clearLoginState(id: string): Promise<void> {

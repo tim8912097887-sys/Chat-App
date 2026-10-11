@@ -1,18 +1,24 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { UserService } from "../user/user.service.js";
 import type { User } from "../user/user.types.js";
+import type { AuthRepository } from "./auth.repository.js";
 import type { PasswordHasher } from "./util/password-hasher.js";
 import { SignupInput } from "./dto/signup.js";
 import { LoginInput } from "./dto/login.js";
 import { InvalidCredentialError } from "./error/invalid-credential.js";
 import { InvalidTokenError } from "./error/invalid-token.js";
 import { LoginLockedError } from "./error/login-locked.js";
-import { TokenPayload, TokenService } from "./util/token-validator.js";
+import {
+  RefreshTokenInput,
+  TokenPayload,
+  TokenService,
+} from "./util/token-validator.js";
 import { AuthTokens } from "./dto/token.js";
 
 export interface AuthServiceOptions {
   maxLoginAttempts: number;
   lockDurationMs: number;
+  refreshTtlSeconds: number;
 }
 
 export class AuthService {
@@ -20,6 +26,7 @@ export class AuthService {
 
   constructor(
     private readonly userService: UserService,
+    private readonly authRepository: AuthRepository,
     private readonly tokenService: TokenService,
     private readonly passwordHasher: PasswordHasher,
     private readonly options: AuthServiceOptions,
@@ -76,16 +83,51 @@ export class AuthService {
       await this.userService.clearLoginState(user.id);
     }
 
-    return this.issueTokens(user);
+    const tokens = await this.issueTokens(user);
+    await this.createRefreshTokenRecord(tokens.refreshToken, randomUUID());
+    return tokens;
   }
 
-  async refresh(token: TokenPayload): Promise<AuthTokens> {
-    const user = await this.requireValidSession(token);
-    return this.issueTokens(user);
+  async refresh(token: RefreshTokenInput): Promise<AuthTokens> {
+    const user = await this.requireValidSession({
+      userId: token.userId,
+      tokenVersion: token.tokenVersion,
+    });
+    const parent = await this.authRepository.findRefreshTokenByHash(
+      this.hashRefreshToken(token.refreshToken),
+    );
+
+    if (!parent) {
+      throw new InvalidTokenError("Invalid token");
+    }
+    // Detect revoked or replaced tokens
+    if (parent.replacedById || parent.revokedAt) {
+      await this.authRepository.invalidateAllRefreshTokensByFamilyId(
+        parent.familyId,
+      );
+      throw new InvalidTokenError("Invalid token");
+    }
+
+    const replacedById = randomUUID();
+
+    const tokens = await this.issueTokens(user);
+
+    await this.authRepository.atomicUpdateRefreshToken({
+      tokenHash: this.hashRefreshToken(token.refreshToken),
+      newTokenHash: this.hashRefreshToken(tokens.refreshToken),
+      replacedById,
+      familyId: parent.familyId,
+      parentId: parent._id,
+      expiredAt: new Date(Date.now() + this.options.refreshTtlSeconds * 1000),
+    });
+    return tokens;
   }
 
-  async logout(token: TokenPayload): Promise<void> {
-    await this.requireValidSession(token);
+  async logout(token: RefreshTokenInput): Promise<void> {
+    await this.authRepository.invalidateRefreshToken({
+      tokenHash: this.hashRefreshToken(token.refreshToken),
+      replacedById: null,
+    });
   }
 
   async logoutAll(token: TokenPayload): Promise<void> {
@@ -116,6 +158,28 @@ export class AuthService {
       this.tokenService.signRefreshToken(payload),
     ]);
     return { accessToken, refreshToken };
+  }
+
+  private async createRefreshTokenRecord(
+    refreshToken: string,
+    id: string,
+    parent?: { id: string; familyId: string } | null,
+  ): Promise<void> {
+    const expiredAt = new Date(
+      Date.now() + this.options.refreshTtlSeconds * 1000,
+    );
+
+    await this.authRepository.createRefreshToken({
+      id,
+      familyId: parent?.familyId ?? randomUUID(),
+      tokenHash: this.hashRefreshToken(refreshToken),
+      parentId: parent?.id ?? null,
+      expiredAt,
+    });
+  }
+
+  private hashRefreshToken(refreshToken: string): string {
+    return createHash("sha256").update(refreshToken).digest("hex");
   }
 
   /** Spend roughly the same time as a real password check when the user doesn't exist. */

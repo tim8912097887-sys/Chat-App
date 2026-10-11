@@ -15,6 +15,6 @@ export const createRefreshTokenMiddleware =
     const payload = await deps.tokenService.verifyRefreshToken(token);
     if (!payload) throw new InvalidTokenError("Invalid refresh token");
 
-    req.refreshToken = payload;
+    req.refreshToken = { ...payload, refreshToken: token };
     next();
   };
