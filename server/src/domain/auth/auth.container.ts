@@ -6,6 +6,8 @@ import { AuthService } from "./auth.service.js";
 import { TokenService } from "./util/token-validator.js";
 import { createRefreshTokenMiddleware } from "../../infrastructure/http/middleware/refresh-token.js";
 import { AppConfig } from "../../config/env/index.js";
+import { getRefreshTokenModel } from "./auth.model.js";
+import { MongoAuthRepository } from "./auth.repository.js";
 
 export interface AuthContainer {
   authService: AuthService;
@@ -22,14 +24,17 @@ export interface AuthContainerDeps {
 
 export const createAuthContainer = (deps: AuthContainerDeps): AuthContainer => {
   const { config, userService, tokenService, passwordHasher } = deps;
+  const authRepository = new MongoAuthRepository(getRefreshTokenModel());
 
   const authService = new AuthService(
     userService,
+    authRepository,
     tokenService,
     passwordHasher,
     {
       maxLoginAttempts: config.auth.maxLoginAttempts,
       lockDurationMs: config.auth.lockDurationMs,
+      refreshTtlSeconds: config.jwt.refreshTtlSeconds,
     },
   );
 
