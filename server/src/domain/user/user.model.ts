@@ -1,27 +1,14 @@
 import { randomUUID } from "node:crypto";
-import mongoose, { Schema } from "mongoose";
-import type { Connection, Model } from "mongoose";
-import type { UserStatus } from "./user.types.js";
+import { models, model, Schema } from "mongoose";
+import type { Model } from "mongoose";
+import { InferSchemaType } from "mongoose";
 
 /** Shape of a document as stored in MongoDB (field names follow the storage spec). */
-export interface UserDocument {
-  _id: string;
-  name: string;
-  email: string;
-  passwordHash: string;
-  imageUrl?: string | null;
-  searchCode: string;
-  status: UserStatus;
-  token_version: number;
-  login_attempt: number;
-  login_locked_at: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type UserDocument = InferSchemaType<typeof userSchema>;
 
 export type UserModel = Model<UserDocument>;
 
-const userSchema = new Schema<UserDocument>(
+const userSchema = new Schema(
   {
     _id: { type: String, default: () => randomUUID() },
     name: { type: String, required: true, trim: true },
@@ -57,5 +44,6 @@ const userSchema = new Schema<UserDocument>(
   { collection: "users", timestamps: true, versionKey: false },
 );
 
-export const registerUserModel = (): UserModel =>
-  mongoose.model<UserDocument>("User", userSchema);
+export function registerUserModel(): UserModel {
+  return models.User ?? model<UserDocument>("User", userSchema);
+}

@@ -43,7 +43,11 @@ export class AuthController {
   };
 
   logoutAll: RequestHandler = async (req, res) => {
-    await this.authService.logoutAll(this.requireRefreshToken(req));
+    const token = this.requireRefreshToken(req);
+    await this.authService.logoutAll({
+      userId: token.userId,
+      tokenVersion: token.tokenVersion,
+    });
     this.clearRefreshCookie(res);
     this.sendResponse(res, 200, { message: "Logged out all sessions" });
   };
@@ -59,7 +63,7 @@ export class AuthController {
       ...this.baseCookieOptions(),
       maxAge: this.cookie.maxAgeMs,
     });
-    this.sendResponse(res, 200, tokens);
+    this.sendResponse(res, 200, { accessToken: tokens.accessToken });
   }
 
   private sendResponse<T>(res: Response, status: number, data: T): void {
