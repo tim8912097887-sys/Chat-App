@@ -1,21 +1,18 @@
-import mongoose from "mongoose";
-import { logger } from "../../config/logger/logger.js";
-import { config } from "../../config/env/index.js";
-import { subscribeShutdown } from "../lifecycle/shutdown.js";
+import mongoose from 'mongoose';
+import { logger } from '../../config/logger/logger.js';
+import { config } from '../../config/env/index.js';
+import { subscribeShutdown } from '../lifecycle/shutdown.js';
 
 export const dbConnection = async () => {
   let mongoConnection: mongoose.Mongoose;
   // Handle database event
-  mongoose.connection.on("error", (error) => {
-    logger.error(`Database Connection Error: ${error.message}`);
+  mongoose.connection.on('error', (error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Database Connection Error: ${errorMessage}`);
   });
-  mongoose.connection.on("connected", () => logger.info(`Database Connected`));
-  mongoose.connection.on("disconnecting", () =>
-    logger.info(`Database is disconnecting`),
-  );
-  mongoose.connection.on("reconnected", () =>
-    logger.info(`Database is reconnected`),
-  );
+  mongoose.connection.on('connected', () => logger.info(`Database Connected`));
+  mongoose.connection.on('disconnecting', () => logger.info(`Database is disconnecting`));
+  mongoose.connection.on('reconnected', () => logger.info(`Database is reconnected`));
   const start = Date.now();
   try {
     mongoConnection = await mongoose.connect(config.database.url, {
@@ -34,7 +31,7 @@ export const dbConnection = async () => {
       // General waiting time
       socketTimeoutMS: 45000,
       // Enhance initialize speed in production
-      autoIndex: config.env === "development",
+      autoIndex: config.env === 'development',
       // Detect failure fast
       heartbeatFrequencyMS: 5000,
     });
@@ -42,9 +39,7 @@ export const dbConnection = async () => {
     subscribeShutdown(dbDisconnection);
     const duration = Date.now() - start;
     // Logger profile for database connection time
-    logger.info(
-      `Database connection: Successfully connect after ${duration}ms`,
-    );
+    logger.info(`Database connection: Successfully connect after ${duration}ms`);
     logger.info(`Database connection: Successfully register shutdown list`);
   } catch (error: any) {
     const duration = Date.now() - start;

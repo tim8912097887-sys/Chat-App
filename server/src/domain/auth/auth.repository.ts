@@ -1,22 +1,18 @@
-import type { RefreshTokenModel } from "./auth.model.js";
+import type { RefreshTokenModel } from './auth.model.js';
 import type {
   AtomicRefreshTokenRecord,
   CreateRefreshTokenRecord,
   InvalidateTokenRecord,
   TokenRecord,
-} from "./auth.types.js";
-import { InvalidTokenError } from "./error/invalid-token.js";
+} from './auth.types.js';
+import { InvalidTokenError } from './error/invalid-token.js';
 
 export interface AuthRepository {
   createRefreshToken(record: CreateRefreshTokenRecord): Promise<void>;
   findRefreshTokenByHash(tokenHash: string): Promise<TokenRecord | null>;
-  invalidateRefreshToken(
-    invalidateTokenRecord: InvalidateTokenRecord,
-  ): Promise<void>;
+  invalidateRefreshToken(invalidateTokenRecord: InvalidateTokenRecord): Promise<void>;
   invalidateAllRefreshTokensByFamilyId(familyId: string): Promise<void>;
-  atomicUpdateRefreshToken(
-    atomicRefreshTokenRecord: AtomicRefreshTokenRecord,
-  ): Promise<void>;
+  atomicUpdateRefreshToken(atomicRefreshTokenRecord: AtomicRefreshTokenRecord): Promise<void>;
 }
 
 export class MongoAuthRepository implements AuthRepository {
@@ -48,34 +44,18 @@ export class MongoAuthRepository implements AuthRepository {
       : null;
   }
 
-  async invalidateRefreshToken(
-    invalidateTokenRecord: InvalidateTokenRecord,
-  ): Promise<void> {
+  async invalidateRefreshToken(invalidateTokenRecord: InvalidateTokenRecord): Promise<void> {
     const { tokenHash, replacedById } = invalidateTokenRecord;
-    await this.refreshTokenModel.updateOne(
-      { tokenHash },
-      { revokedAt: new Date(), replacedById },
-    );
+    await this.refreshTokenModel.updateOne({ tokenHash }, { revokedAt: new Date(), replacedById });
   }
 
   async invalidateAllRefreshTokensByFamilyId(familyId: string): Promise<void> {
-    await this.refreshTokenModel.updateMany(
-      { familyId },
-      { revokedAt: new Date() },
-    );
+    await this.refreshTokenModel.updateMany({ familyId }, { revokedAt: new Date() });
   }
 
-  async atomicUpdateRefreshToken(
-    atomicRefreshTokenRecord: AtomicRefreshTokenRecord,
-  ) {
-    const {
-      tokenHash,
-      replacedById,
-      familyId,
-      parentId,
-      expiredAt,
-      newTokenHash,
-    } = atomicRefreshTokenRecord;
+  async atomicUpdateRefreshToken(atomicRefreshTokenRecord: AtomicRefreshTokenRecord) {
+    const { tokenHash, replacedById, familyId, parentId, expiredAt, newTokenHash } =
+      atomicRefreshTokenRecord;
     const session = await this.refreshTokenModel.db.startSession();
     try {
       await session.withTransaction(async () => {
@@ -87,7 +67,7 @@ export class MongoAuthRepository implements AuthRepository {
           .session(session);
 
         if (!result) {
-          throw new InvalidTokenError("Invalid token");
+          throw new InvalidTokenError('Invalid token');
         }
         await this.refreshTokenModel.create(
           [
@@ -104,8 +84,6 @@ export class MongoAuthRepository implements AuthRepository {
           },
         );
       });
-    } catch (err) {
-      throw err;
     } finally {
       await session.endSession();
     }

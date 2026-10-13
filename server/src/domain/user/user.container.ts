@@ -1,8 +1,7 @@
-import type { Connection } from "mongoose";
-import { registerUserModel } from "./user.model.js";
-import { MongoUserRepository } from "./user.repository.js";
-import type { UserRepository } from "./user.repository.js";
-import { UserService } from "./user.service.js";
+import { registerUserModel } from './user.model.js';
+import { MongoUserRepository } from './user.repository.js';
+import type { UserRepository } from './user.repository.js';
+import { UserService } from './user.service.js';
 
 export interface UserContainer {
   userRepository: UserRepository;
