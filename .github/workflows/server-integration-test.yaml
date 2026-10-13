@@ -1,0 +1,104 @@
+name: Server-Integration-Test
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/server
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.filter.outputs.server }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Check for file changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            server:
+              - 'server/**'
+              - '.github/workflows/server-integration-test.yaml'
+  test-server:
+    needs: changes
+    if: ${{ needs.changes.outputs.server == 'true' }}
+    environment:
+      name: server-integration-test
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mongodb://localhost:27017/chat-app?replicaSet=rs0
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: debug
+      NODE_ENV: test
+      PORT: 3000
+      JWT_ISSUER: auth-service
+      ACCESS_TOKEN_TTL_SECONDS: 900
+      REFRESH_TOKEN_TTL_SECONDS: 604800
+      BCRYPT_COST: 12
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+    defaults:
+      run:
+        working-directory: ./server
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - "27017:27017"
+        command: mongod --replSet rs0 --bind_ip_all
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Initialize Environment
+        uses: ./.github/actions/setup-node-and-dependency
+        with:
+          node-version: 22
+          pnpm-version: 10.26.1
+          working-directory: ./server
+      - name: Install MongoDB Shell (mongosh)
+        run: npm install -g mongosh
+      - name: Initialize Mongo Replica Set
+        run: |
+          mongosh --host localhost:27017 --eval '
+          rs.initiate({
+              _id: "rs0",
+              members: [
+              { _id: 0, host: "localhost:27017" }
+              ]
+          })
+          '
+      - name: Wait for Primary
+        run: |
+          until mongosh --host localhost:27017 --quiet --eval "db.hello().isWritablePrimary" | grep true
+          do
+          sleep 2
+          done
+      - name: Run Tests
+        run: pnpm test
+  server-test-status:
+    needs: [changes, test-server]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate Status
+        run: |
+          BUILD_RESULT="${{ needs.test-server.result }}"
+
+          if [ "$BUILD_RESULT" = "success" ] || [ "$BUILD_RESULT" = "skipped" ]; then
+            echo "Server tests passed or were safely skipped."
+            exit 0
+          else
+            echo "Server tests failed!"
+            exit 1
+          fi
