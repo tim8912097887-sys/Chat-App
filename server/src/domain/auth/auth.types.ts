@@ -26,3 +26,10 @@ export type AtomicRefreshTokenRecord = {
   replacedById: string;
   expiredAt: Date;
 };
+
+export interface RefreshCookieOptions {
+  name: string;
+  path: string;
+  secure: boolean;
+  maxAgeMs: number;
+}

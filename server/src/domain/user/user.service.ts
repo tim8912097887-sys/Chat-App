@@ -44,8 +44,8 @@ export class UserService {
     return this.userRepository.clearLoginState(userId);
   }
 
-  revokeAllTokens(userId: string): Promise<void> {
-    return this.userRepository.incrementTokenVersion(userId);
+  incrementTokenVersion(userId: string, tokenVersion: number): Promise<void> {
+    return this.userRepository.incrementTokenVersion(userId, tokenVersion);
   }
 
   private toUserDomain(userDocument: UserDocument): User {
@@ -57,9 +57,9 @@ export class UserService {
       imageUrl: userDocument.imageUrl ?? null,
       searchCode: userDocument.searchCode,
       status: userDocument.status,
-      tokenVersion: userDocument.token_version,
-      loginAttempt: userDocument.login_attempt,
-      loginLockedAt: userDocument.login_locked_at ?? null,
+      tokenVersion: userDocument.tokenVersion,
+      loginAttempt: userDocument.loginAttempt,
+      loginLockedAt: userDocument.loginLockedAt ?? null,
       createdAt: userDocument.createdAt,
       updatedAt: userDocument.updatedAt,
     };

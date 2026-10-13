@@ -5,13 +5,7 @@ import { LoginInput } from "./dto/login.js";
 import { successResponse } from "../../shared/http/success.js";
 import { InvalidTokenError } from "./error/invalid-token.js";
 import { AuthTokens } from "./dto/token.js";
-
-export interface RefreshCookieOptions {
-  name: string;
-  path: string;
-  secure: boolean;
-  maxAgeMs: number;
-}
+import { RefreshCookieOptions } from "./auth.types.js";
 
 export class AuthController {
   constructor(
@@ -21,7 +15,7 @@ export class AuthController {
 
   signup: RequestHandler = async (req, res) => {
     await this.authService.signup(req.body as SignupInput);
-    this.sendResponse(res, 200, { message: "Signed up" });
+    this.sendResponse(res, 201, { message: "Signed up" });
   };
 
   login: RequestHandler = async (req, res) => {

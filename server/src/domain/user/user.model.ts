@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { models, model, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 import type { Model } from "mongoose";
 import { InferSchemaType } from "mongoose";
 
@@ -37,13 +37,13 @@ const userSchema = new Schema(
       default: "ACTIVE",
       required: true,
     },
-    token_version: { type: Number, default: 0, required: true },
-    login_attempt: { type: Number, default: 0, required: true },
-    login_locked_at: { type: Date, default: null },
+    tokenVersion: { type: Number, default: 0, required: true },
+    loginAttempt: { type: Number, default: 0, required: true },
+    loginLockedAt: { type: Date, default: null },
   },
   { collection: "users", timestamps: true, versionKey: false },
 );
 
 export function registerUserModel(): UserModel {
-  return models.User ?? model<UserDocument>("User", userSchema);
+  return mongoose.models.User ?? model<UserDocument>("User", userSchema);
 }

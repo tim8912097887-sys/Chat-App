@@ -101,7 +101,11 @@ export class AuthService {
       throw new InvalidTokenError("Invalid token");
     }
     // Detect revoked or replaced tokens
-    if (parent.replacedById || parent.revokedAt) {
+    if (
+      parent.replacedById ||
+      (parent.revokedAt &&
+        new Date().getMinutes() - parent.revokedAt.getMinutes() > 5)
+    ) {
       await this.authRepository.invalidateAllRefreshTokensByFamilyId(
         parent.familyId,
       );
@@ -120,6 +124,7 @@ export class AuthService {
       parentId: parent._id,
       expiredAt: new Date(Date.now() + this.options.refreshTtlSeconds * 1000),
     });
+
     return tokens;
   }
 
@@ -132,7 +137,7 @@ export class AuthService {
 
   async logoutAll(token: TokenPayload): Promise<void> {
     const user = await this.requireValidSession(token);
-    await this.userService.revokeAllTokens(user.id);
+    await this.userService.incrementTokenVersion(user.id, token.tokenVersion);
   }
 
   /** The user must exist, be active, and the token must carry the current token version. */

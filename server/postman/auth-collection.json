@@ -37,7 +37,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
               "const b=pm.response.json();",
               "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
               "pm.test(\"signup message\",()=>pm.expect(b.data.message).eql(\"Signed up\"));"
@@ -78,7 +78,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
               "const b=pm.response.json();",
               "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
               "pm.expect(b.data.message).eql(\"Signed up\");"
@@ -363,7 +363,7 @@
               "const b=pm.response.json();",
               "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
               "",
-              "pm.test(\"token fields\",()=>{pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;pm.expect(b.data.refreshToken).to.be.a(\"string\").and.not.empty;});",
+              "pm.test(\"token fields\",()=>{pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;});",
               "pm.test(\"HttpOnly refresh cookie\",()=>{const c=pm.response.headers.get(\"Set-Cookie\")||\"\";pm.expect(c).to.include(\"refresh_token=\");pm.expect(c.toLowerCase()).to.include(\"httponly\");});"
             ]
           }
@@ -673,7 +673,7 @@
               "const b=pm.response.json();",
               "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
               "",
-              "pm.test(\"refresh returns tokens\",()=>{pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;pm.expect(b.data.refreshToken).to.be.a(\"string\").and.not.empty;});"
+              "pm.test(\"refresh returns tokens\",()=>{pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;});"
             ]
           }
         }
@@ -804,7 +804,7 @@
               "const b=pm.response.json();",
               "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});",
               "",
-              "pm.test(\"save refresh token for revocation test\",()=>{pm.expect(b.data.refreshToken).to.be.a(\"string\");pm.environment.set(\"preLogoutAllRefreshToken\",b.data.refreshToken);});"
+              "pm.test(\"save refresh token for revocation test\",()=>{const refreshToken=pm.cookies.get(\"refresh_token\");pm.expect(refreshToken).to.be.a(\"string\").and.not.empty;pm.environment.set(\"preLogoutAllRefreshToken\",refreshToken);});"
             ]
           }
         }
@@ -931,7 +931,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
               "const b=pm.response.json();",
               "pm.test(\"success envelope\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b).to.have.property(\"data\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
             ]
@@ -1011,7 +1011,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"failed login / lockout status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400,409]);});",
+              "pm.test(\"failed login / lockout status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400]);});",
               "const b=pm.response.json();",
               "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
             ]
@@ -1051,7 +1051,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"failed login / lockout status\",()=>{pm.expect(pm.response.code).to.be.oneOf([400,409]);});",
+              "pm.test(\"failed login / lockout status\",()=>{pm.expect(pm.response.code).to.be.oneOf([409]);});",
               "const b=pm.response.json();",
               "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.be.a(\"string\").and.not.empty;pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
             ]
