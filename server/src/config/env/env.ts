@@ -38,7 +38,8 @@ if (!parsed.success) {
     "Invalid environment variables:",
     z.prettifyError(parsed.error),
   );
-  process.exit(1);
+  // Throw error instead of exit to preserve error stack
+  throw parsed.error
 }
 
 export const env = parsed.data;
