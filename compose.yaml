@@ -3,30 +3,24 @@ services:
     image: mongo:8
     container_name: db
     restart: unless-stopped
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
     ports:
       - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
       - mongo_data:/data/db
     healthcheck:
       test:
         [
-          "CMD",
-          "mongosh",
-          "--username",
-          "admin",
-          "--password",
-          "password",
-          "--authenticationDatabase",
-          "admin",
-          "--eval",
-          "db.adminCommand('ping')",
+          "CMD-SHELL",
+          'mongosh --quiet --eval "try { rs.status() } catch (e) { rs.initiate({_id:''rs0'',members:[{_id:0,host:''db:27017''}]}) }"',
         ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 20s
   server:
     build:

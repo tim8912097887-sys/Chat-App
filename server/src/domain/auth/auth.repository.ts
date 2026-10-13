@@ -5,6 +5,7 @@ import type {
   InvalidateTokenRecord,
   TokenRecord,
 } from "./auth.types.js";
+import { InvalidTokenError } from "./error/invalid-token.js";
 
 export interface AuthRepository {
   createRefreshToken(record: CreateRefreshTokenRecord): Promise<void>;
@@ -33,7 +34,7 @@ export class MongoAuthRepository implements AuthRepository {
 
   async findRefreshTokenByHash(tokenHash: string): Promise<TokenRecord | null> {
     const record = await this.refreshTokenModel
-      .findOne({ tokenHash, expiresAt: { $gt: new Date() } })
+      .findOne({ tokenHash, expiredAt: { $gt: new Date() } })
       .select({ _id: 1, familyId: 1, revokedAt: 1, replacedById: 1 })
       .lean()
       .exec();
@@ -78,17 +79,33 @@ export class MongoAuthRepository implements AuthRepository {
     const session = await this.refreshTokenModel.db.startSession();
     try {
       await session.withTransaction(async () => {
-        await this.refreshTokenModel
-          .updateOne({ tokenHash }, { revokedAt: new Date(), replacedById })
+        const result = await this.refreshTokenModel
+          .findOneAndUpdate(
+            { tokenHash, revokedAt: null, replacedById: null },
+            { revokedAt: new Date(), replacedById },
+          )
           .session(session);
-        await this.refreshTokenModel.create({
-          _id: replacedById,
-          familyId,
-          tokenHash: newTokenHash,
-          parentId,
-          expiredAt,
-        });
+
+        if (!result) {
+          throw new InvalidTokenError("Invalid token");
+        }
+        await this.refreshTokenModel.create(
+          [
+            {
+              _id: replacedById,
+              familyId,
+              tokenHash: newTokenHash,
+              parentId,
+              expiredAt,
+            },
+          ],
+          {
+            session,
+          },
+        );
       });
+    } catch (err) {
+      throw err;
     } finally {
       await session.endSession();
     }

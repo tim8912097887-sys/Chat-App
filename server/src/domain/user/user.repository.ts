@@ -16,7 +16,7 @@ export interface UserRepository {
     options: { maxAttempts: number; lockedAt: Date },
   ): Promise<FailedLoginResult>;
   clearLoginState(id: string): Promise<void>;
-  incrementTokenVersion(id: string): Promise<void>;
+  incrementTokenVersion(id: string, tokenVersion: number): Promise<void>;
 }
 
 export class MongoUserRepository implements UserRepository {
@@ -65,57 +65,55 @@ export class MongoUserRepository implements UserRepository {
     id: string,
     options: { maxAttempts: number; lockedAt: Date },
   ): Promise<FailedLoginResult> {
-    const session = await this.userModel.db.startSession();
+    const increment = await this.userModel
+      .updateOne(
+        {
+          _id: id,
+          loginLockedAt: null,
+          loginAttempt: { $lt: options.maxAttempts - 1 },
+        },
+        { $inc: { loginAttempt: 1 } },
+      )
+      .exec();
 
-    try {
-      let isLocked = false;
-
-      await session.withTransaction(async () => {
-        const user = await this.userModel
-          .findById(id)
-          .session(session)
-          .lean<UserDocument>()
-          .exec();
-
-        if (!user) return;
-
-        const newAttempts = (user.login_attempt || 0) + 1;
-
-        if (newAttempts < options.maxAttempts) {
-          await this.userModel.updateOne(
-            { _id: id },
-            { $set: { login_attempt: newAttempts } },
-            { session },
-          );
-          isLocked = false;
-        } else {
-          await this.userModel.updateOne(
-            { _id: id },
-            { $set: { login_attempt: 0, login_locked_at: options.lockedAt } },
-            { session },
-          );
-          isLocked = true;
-        }
-      });
-
-      return { locked: isLocked };
-    } finally {
-      await session.endSession();
+    if (increment.modifiedCount > 0) {
+      return { locked: false };
     }
+
+    const lock = await this.userModel
+      .updateOne(
+        {
+          _id: id,
+          loginLockedAt: null,
+          loginAttempt: { $gte: options.maxAttempts - 1 },
+        },
+        { $set: { loginAttempt: 0, loginLockedAt: options.lockedAt } },
+      )
+      .exec();
+
+    if (lock.modifiedCount > 0) {
+      return { locked: true };
+    }
+
+    const user = await this.findById(id);
+    return { locked: user?.loginLockedAt != null };
   }
 
   async clearLoginState(id: string): Promise<void> {
     await this.userModel
       .updateOne(
         { _id: id },
-        { $set: { login_attempt: 0, login_locked_at: null } },
+        { $set: { loginAttempt: 0, loginLockedAt: null } },
       )
       .exec();
   }
 
-  async incrementTokenVersion(id: string): Promise<void> {
+  async incrementTokenVersion(id: string, tokenVersion: number): Promise<void> {
     await this.userModel
-      .updateOne({ _id: id }, { $inc: { token_version: 1 } })
+      .updateOne(
+        { _id: id, tokenVersion },
+        { $inc: { tokenVersion: 1 } },
+      )
       .exec();
   }
 }

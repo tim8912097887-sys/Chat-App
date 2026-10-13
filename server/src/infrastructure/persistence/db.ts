@@ -56,6 +56,6 @@ export const dbConnection = async () => {
   return mongoConnection;
 };
 
-const dbDisconnection = async () => {
+export const dbDisconnection = async () => {
   await mongoose.connection.close();
 };
