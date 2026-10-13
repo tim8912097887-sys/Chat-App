@@ -1,11 +1,11 @@
-import eslint from "@eslint/js";
-import { defineConfig } from "eslint/config";
-import tseslint from "typescript-eslint";
+import eslint from '@eslint/js';
+import { defineConfig } from 'eslint/config';
+import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   // Global ignore patterns (applies to all configurations)
   {
-    ignores: ["dist", "node_modules", "coverage", "build", "eslint.config.mjs"],
+    ignores: ['dist', 'node_modules', 'src/__tests__', 'coverage', 'build', 'eslint.config.mjs'],
   },
 
   // Base ESLint recommended rules
@@ -24,32 +24,32 @@ export default defineConfig(
     },
     rules: {
       // Allow underscores for unused parameters/variables
-      "@typescript-eslint/no-unused-vars": [
-        "warn", // Using 'warn' in dev/prod keeps builds flexible while highlighting dead code
+      '@typescript-eslint/no-unused-vars': [
+        'warn', // Using 'warn' in dev/prod keeps builds flexible while highlighting dead code
         {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
 
       // Permissive Type Rules (Not Too Strict)
-      "@typescript-eslint/no-explicit-any": "off", // Allows flexibility when typing complex objects
-      "@typescript-eslint/restrict-template-expressions": "off", // Allows ${number} or${boolean} in template literals
-      "@typescript-eslint/no-extraneous-class": "off",
-      "@typescript-eslint/no-non-null-assertion": "off", // Allows using `!` operator when you know a value exists
+      '@typescript-eslint/no-explicit-any': 'off', // Allows flexibility when typing complex objects
+      '@typescript-eslint/restrict-template-expressions': 'off', // Allows ${number} or${boolean} in template literals
+      '@typescript-eslint/no-extraneous-class': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off', // Allows using `!` operator when you know a value exists
 
       // Smooth handling for async event handlers (e.g. onClick={async () => ...})
-      "@typescript-eslint/no-misused-promises": [
-        "error",
+      '@typescript-eslint/no-misused-promises': [
+        'error',
         {
           checksVoidReturn: false,
         },
       ],
 
       // Practical production defaults
-      "no-console": ["warn", { allow: ["warn", "error"] }], // Warns on console.log, but allows console.warn/error
-      "no-debugger": "error",
+      'no-console': ['warn', { allow: ['warn', 'error'] }], // Warns on console.log, but allows console.warn/error
+      'no-debugger': 'error',
     },
   },
 );
