@@ -7,7 +7,7 @@ export interface InputProps<
   id: string;
   name: Path<TFieldValues>;
   type: HTMLInputTypeAttribute;
-  register: UseFormRegister<TFieldValues>;
+  register: UseFormRegister<any>;
 }
 
 export function Input({

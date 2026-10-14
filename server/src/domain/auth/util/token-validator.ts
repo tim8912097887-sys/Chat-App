@@ -1,6 +1,6 @@
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify } from 'jose';
 
-export type TokenType = "access" | "refresh";
+export type TokenType = 'access' | 'refresh';
 
 export interface TokenPayload {
   userId: string;
@@ -38,29 +38,19 @@ export class JoseTokenService implements TokenService {
   }
 
   signAccessToken(payload: TokenPayload): Promise<string> {
-    return this.sign(
-      "access",
-      payload,
-      this.accessKey,
-      this.options.accessTtlSeconds,
-    );
+    return this.sign('access', payload, this.accessKey, this.options.accessTtlSeconds);
   }
 
   signRefreshToken(payload: TokenPayload): Promise<string> {
-    return this.sign(
-      "refresh",
-      payload,
-      this.refreshKey,
-      this.options.refreshTtlSeconds,
-    );
+    return this.sign('refresh', payload, this.refreshKey, this.options.refreshTtlSeconds);
   }
 
   verifyAccessToken(token: string): Promise<RefreshTokenInput | null> {
-    return this.verify("access", token, this.accessKey);
+    return this.verify('access', token, this.accessKey);
   }
 
   verifyRefreshToken(token: string): Promise<RefreshTokenInput | null> {
-    return this.verify("refresh", token, this.refreshKey);
+    return this.verify('refresh', token, this.refreshKey);
   }
 
   private sign(
@@ -69,13 +59,16 @@ export class JoseTokenService implements TokenService {
     key: Uint8Array,
     ttlSeconds: number,
   ): Promise<string> {
-    return new SignJWT({ ver: payload.tokenVersion, typ: type })
-      .setProtectedHeader({ alg: "HS256" })
+    const jwt = new SignJWT({ ver: payload.tokenVersion, typ: type })
+      .setProtectedHeader({ alg: 'HS256' })
       .setSubject(payload.userId)
       .setIssuer(this.options.issuer)
       .setIssuedAt()
-      .setExpirationTime(`${ttlSeconds}s`)
-      .sign(key);
+      .setExpirationTime(`${ttlSeconds}s`);
+    if (type === 'refresh') {
+      jwt.setJti(crypto.randomUUID());
+    }
+    return jwt.sign(key);
   }
 
   private async verify(
@@ -86,11 +79,10 @@ export class JoseTokenService implements TokenService {
     try {
       const { payload } = await jwtVerify(token, key, {
         issuer: this.options.issuer,
-        algorithms: ["HS256"],
+        algorithms: ['HS256'],
       });
       if (payload.typ !== type) return null;
-      if (typeof payload.sub !== "string" || typeof payload.ver !== "number")
-        return null;
+      if (typeof payload.sub !== 'string' || typeof payload.ver !== 'number') return null;
       return {
         refreshToken: token,
         userId: payload.sub,
