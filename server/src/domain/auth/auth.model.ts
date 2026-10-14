@@ -50,7 +50,7 @@ export const refreshTokenSchema = new Schema(
   },
 );
 
-refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+refreshTokenSchema.index({ expiredAt: 1 }, { expireAfterSeconds: 0 });
 
 export function getRefreshTokenModel(): RefreshTokenModel {
   return (
