@@ -1,25 +1,26 @@
 import type { InputHTMLAttributes, HTMLInputTypeAttribute } from "react";
+import type { FieldValues, UseFormRegister, Path } from "react-hook-form";
 
-export interface InputProps extends Omit<
-  InputHTMLAttributes<HTMLInputElement>,
-  "id" | "name" | "type"
-> {
+export interface InputProps<
+  TFieldValues extends FieldValues = FieldValues,
+> extends Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "type"> {
   id: string;
-  name: string;
+  name: Path<TFieldValues>;
   type: HTMLInputTypeAttribute;
+  register: UseFormRegister<TFieldValues>;
 }
 
 export function Input({
   id,
   name,
   type,
+  register,
   className = "",
   ...props
 }: InputProps) {
   return (
     <input
       id={id}
-      name={name}
       type={type}
       className={[
         "block w-full min-w-0 rounded-lg border border-slate-300",
@@ -41,6 +42,7 @@ export function Input({
         className,
       ].join(" ")}
       {...props}
+      {...register(name)}
     />
   );
 }

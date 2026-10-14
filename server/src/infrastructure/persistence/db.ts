@@ -31,7 +31,7 @@ export const dbConnection = async () => {
       // General waiting time
       socketTimeoutMS: 45000,
       // Enhance initialize speed in production
-      autoIndex: config.env === 'development',
+      autoIndex: true,
       // Detect failure fast
       heartbeatFrequencyMS: 5000,
     });

@@ -86,7 +86,7 @@ export function Button({
         </svg>
       )}
 
-      {children}
+      {!isDisabled && children}
     </button>
   );
 }
