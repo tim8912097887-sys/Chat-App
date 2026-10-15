@@ -6,16 +6,25 @@ import type { LoginResponse, SignupResponse } from "../../types";
 import { authClient } from "../client/client";
 
 const signup = async (input: SignupInput): Promise<SignupResponse> => {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const formData = new FormData();
+
+  formData.append("name", input.name);
+  formData.append("email", input.email);
+  formData.append("password", input.password);
+
+  if (input.image) {
+    formData.append("image", input.image);
+  }
+
   const res = await authClient.post<ApiSuccessResponse<SignupResponse>>(
     SIGNUP_URL,
-    input,
+    formData,
   );
+
   return res.data.data;
 };
 
 const login = async (input: LoginInput): Promise<LoginResponse> => {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
   const res = await authClient.post<ApiSuccessResponse<LoginResponse>>(
     LOGIN_URL,
     input,

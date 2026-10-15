@@ -1,6 +1,6 @@
-import { UserDocument } from "./user.model.js";
+import { UserDocument } from './user.model.js';
 
-export type UserStatus = "ACTIVE" | "DISABLED";
+export type UserStatus = 'ACTIVE' | 'DISABLED';
 
 export interface User {
   id: string;
@@ -21,15 +21,15 @@ export interface CreateUserInput {
   name: string;
   email: string;
   passwordHash: string;
-  imageUrl?: string | undefined;
+  imageUrl?: string | null;
 }
 
 export type CreateUserRecord = CreateUserInput & { searchCode: string };
 
 export type CreateUserResult =
-  | { status: "CREATED"; user: UserDocument }
-  | { status: "EMAIL_TAKEN" }
-  | { status: "SEARCH_CODE_TAKEN" };
+  | { status: 'CREATED'; user: UserDocument }
+  | { status: 'EMAIL_TAKEN' }
+  | { status: 'SEARCH_CODE_TAKEN' };
 
 export interface FailedLoginResult {
   locked: boolean;

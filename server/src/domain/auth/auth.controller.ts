@@ -1,11 +1,11 @@
-import type { CookieOptions, Request, RequestHandler, Response } from "express";
-import type { AuthService } from "./auth.service.js";
-import { SignupInput } from "./dto/signup.js";
-import { LoginInput } from "./dto/login.js";
-import { successResponse } from "../../shared/http/success.js";
-import { InvalidTokenError } from "./error/invalid-token.js";
-import { AuthTokens } from "./dto/token.js";
-import { RefreshCookieOptions } from "./auth.types.js";
+import type { CookieOptions, Request, RequestHandler, Response } from 'express';
+import type { AuthService } from './auth.service.js';
+import { SignupInput } from './dto/signup.js';
+import { LoginInput } from './dto/login.js';
+import { successResponse } from '../../shared/http/success.js';
+import { InvalidTokenError } from './error/invalid-token.js';
+import { AuthTokens } from './dto/token.js';
+import { RefreshCookieOptions } from './auth.types.js';
 
 export class AuthController {
   constructor(
@@ -14,8 +14,17 @@ export class AuthController {
   ) {}
 
   signup: RequestHandler = async (req, res) => {
-    await this.authService.signup(req.body as SignupInput);
-    this.sendResponse(res, 201, { message: "Signed up" });
+    const image = req.file;
+    await this.authService.signup(
+      req.body as SignupInput,
+      image
+        ? {
+            buffer: image.buffer,
+            mimetype: image.mimetype,
+          }
+        : undefined,
+    );
+    this.sendResponse(res, 201, { message: 'Signed up' });
   };
 
   login: RequestHandler = async (req, res) => {
@@ -24,16 +33,14 @@ export class AuthController {
   };
 
   refresh: RequestHandler = async (req, res) => {
-    const tokens = await this.authService.refresh(
-      this.requireRefreshToken(req),
-    );
+    const tokens = await this.authService.refresh(this.requireRefreshToken(req));
     this.sendTokens(res, tokens);
   };
 
   logout: RequestHandler = async (req, res) => {
     await this.authService.logout(this.requireRefreshToken(req));
     this.clearRefreshCookie(res);
-    this.sendResponse(res, 200, { message: "Logged out" });
+    this.sendResponse(res, 200, { message: 'Logged out' });
   };
 
   logoutAll: RequestHandler = async (req, res) => {
@@ -43,12 +50,12 @@ export class AuthController {
       tokenVersion: token.tokenVersion,
     });
     this.clearRefreshCookie(res);
-    this.sendResponse(res, 200, { message: "Logged out all sessions" });
+    this.sendResponse(res, 200, { message: 'Logged out all sessions' });
   };
 
   private requireRefreshToken(req: Request) {
     // Set by the refresh-token middleware; guards against the route being wired without it.
-    if (!req.refreshToken) throw new InvalidTokenError("Missing refresh token");
+    if (!req.refreshToken) throw new InvalidTokenError('Missing refresh token');
     return req.refreshToken;
   }
 
@@ -72,7 +79,7 @@ export class AuthController {
     return {
       httpOnly: true,
       secure: this.cookie.secure,
-      sameSite: "lax",
+      sameSite: 'lax',
       path: this.cookie.path,
     };
   }
