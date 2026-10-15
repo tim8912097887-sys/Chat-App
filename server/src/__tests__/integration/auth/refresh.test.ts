@@ -130,10 +130,11 @@ describe('refresh', () => {
     it('when user refresh twice in a row first should return 200 with access token and second should return 401 with authentication error', async () => {
       const { cookie } = await createRefreshCookie();
 
-      const [first, second] = await Promise.all([
+      const res = await Promise.all([
         api().post(REFRESH_URL).set('Cookie', cookie),
         api().post(REFRESH_URL).set('Cookie', cookie),
       ]);
+      const [first, second] = res.sort((a, b) => a.status - b.status);
 
       expectSuccessDataResponse(first, 200, {
         accessToken: expect.any(String),

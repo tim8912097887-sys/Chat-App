@@ -3,7 +3,11 @@ import { AuthHeader } from "../components/AuthHeader";
 import { Input, InputContainer } from "../../../common/components/input";
 import { Button } from "../../../common/components/button";
 import AuthFooter from "../components/AuthFooter";
-import { signupSchema, type SignupInput } from "../input/signup";
+import {
+  signupSchema,
+  type SignupFormInput,
+  type SignupInput,
+} from "../input/signup";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { authQuery } from "../api/query/query";
@@ -14,11 +18,14 @@ import { toast } from "react-toastify";
 
 export default function SignupPage() {
   const navigation = useNavigate();
-  const { register, handleSubmit, formState, clearErrors, setError } =
-    useForm<SignupInput>({
-      resolver: zodResolver(signupSchema),
-      mode: "onBlur",
-    });
+  const { register, handleSubmit, formState, clearErrors, setError } = useForm<
+    SignupFormInput,
+    unknown,
+    SignupInput
+  >({
+    resolver: zodResolver(signupSchema),
+    mode: "onBlur",
+  });
   async function onSubmit(input: SignupInput) {
     clearErrors();
     try {
@@ -110,7 +117,7 @@ export default function SignupPage() {
           id="image"
           label="Profile image"
           hint="Optional. PNG, JPEG, or WebP."
-          error={formState.errors.imageUrl?.message}
+          error={formState.errors.image?.message}
         >
           <Input
             id="image"

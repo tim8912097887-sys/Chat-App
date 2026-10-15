@@ -1,13 +1,13 @@
-import { env } from "./env.js";
+import { env } from './env.js';
 
-const isProduction = env.NODE_ENV === "production";
+const isProduction = env.NODE_ENV === 'production';
 
 export const config = {
   env: env.NODE_ENV,
   isProduction,
   port: env.PORT,
   cors: {
-    origins: env.CORS_ORIGIN.split(",").map((o) => o.trim()),
+    origins: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
   },
   logger: { level: env.LOG_LEVEL },
   database: { url: env.DATABASE_URL },
@@ -22,8 +22,13 @@ export const config = {
   auth: {
     maxLoginAttempts: 3,
     lockDurationMs: 15 * 60 * 1000,
-    refreshCookieName: "refresh_token",
-    refreshCookiePath: "/api/v1/auth",
+    refreshCookieName: 'refresh_token',
+    refreshCookiePath: '/api/v1/auth',
+  },
+  cloudinary: {
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    apiSecret: env.CLOUDINARY_API_SECRET,
   },
 } as const;
 
