@@ -61,7 +61,13 @@ jobs:
     steps:
       - name: Evaluate Status
         run: |
+          CHANGE_RESULT="${{ needs.changes.result }}"
           TEST_RESULT="${{ needs.test-client.result }}"
+
+          if [ "$CHANGE_RESULT" != "success" ]; then
+            echo "Change detection failed!"
+            exit 1
+          fi
 
           if [ "$TEST_RESULT" = "success" ] || [ "$TEST_RESULT" = "skipped" ]; then
             echo "Client tests passed or were safely skipped."
