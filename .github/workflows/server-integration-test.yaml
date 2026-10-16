@@ -96,7 +96,13 @@ jobs:
     steps:
       - name: Evaluate Status
         run: |
+          CHANGE_RESULT="${{ needs.changes.result }}"
           BUILD_RESULT="${{ needs.test-server.result }}"
+
+          if [ "$CHANGE_RESULT" != "success" ]; then
+            echo "Change detection failed!"
+            exit 1
+          fi
 
           if [ "$BUILD_RESULT" = "success" ] || [ "$BUILD_RESULT" = "skipped" ]; then
             echo "Server tests passed or were safely skipped."
