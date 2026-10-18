@@ -1,10 +1,13 @@
 import { describe, expect, it, vi, vitest } from 'vitest';
 import { signupUserInput } from '../../utils/auth/factory.js';
-import { api } from '../../utils/auth/app.js';
+import { api } from '../../utils/common/app.js';
 import { SIGNUP_URL } from '../../utils/auth/constants.js';
-import { truncateAuthAndUser, userRepository } from '../../utils/auth/query.js';
+import { truncateAll, userRepository } from '../../utils/common/query.js';
 import { beforeEach } from 'vitest';
-import { expectSuccessMessageResponse } from '../../utils/common/assertion.js';
+import {
+  expectSuccessMessageResponse,
+  expectValidationError,
+} from '../../utils/common/assertion.js';
 import { userResult } from '../../utils/auth/assertion.js';
 import { MongoUserRepository } from '../../../domain/user/user.repository.js';
 import { invalidSignupInputs } from '../../utils/auth/invalid-inputs.js';
@@ -15,7 +18,7 @@ const validInput = signupUserInput();
 
 describe('signup', () => {
   beforeEach(async () => {
-    await truncateAuthAndUser();
+    await truncateAll();
   });
 
   describe('success', () => {
@@ -131,13 +134,7 @@ describe('signup', () => {
     it.each(invalidSignupInputs)('$description', async ({ input, expectedDetail }) => {
       const res = await api().post(SIGNUP_URL).send(input);
 
-      expect(res.status).toBe(400);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: { code: 'BadRequestError' },
-        data: null,
-      });
-      expect(res.body.error.detail).toContain(expectedDetail);
+      expectValidationError(res, expectedDetail);
       expect(await userRepository.findByEmail(validInput.email)).toBeNull();
     });
 

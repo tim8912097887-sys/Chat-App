@@ -1,9 +1,9 @@
 import { SignJWT } from 'jose';
 import { LoginInput } from '../../../domain/auth/dto/login.js';
 import type { SignupInput } from '../../../domain/auth/dto/signup.js';
-import { api } from './app.js';
+import { api } from '../common/app.js';
 import { LOGIN_URL, REFRESH_COOKIE_NAME, SIGNUP_URL } from './constants.js';
-import { authModel } from './query.js';
+import { authModel } from '../common/query.js';
 import { config } from '../../../config/env/index.js';
 
 export function signupUserInput(props: Partial<SignupInput> = {}): SignupInput {
