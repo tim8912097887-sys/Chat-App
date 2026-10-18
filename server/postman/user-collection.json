@@ -1,0 +1,1046 @@
+{
+  "info": {
+    "_postman_id": "f76d2c4c-84f3-4b5a-9b3c-680b189ab641",
+    "name": "Chat App User API - Newman Edge Cases",
+    "description": "User search endpoint success and query-parameter edge cases. Set baseUrl to the server origin and run against a disposable test database.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Setup - Signup dedicated friend-search test user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/signup",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Friend Search Newman User\",\n  \"email\": \"friend-search-newman@example.test\",\n  \"password\": \"FriendSearchTestPassword123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
+              "const b=pm.response.json();",
+              "pm.test(\"signup succeeds\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data.message).eql(\"Signed up\");});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Setup - Login dedicated friend-search test user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"friend-search-newman@example.test\",\n  \"password\": \"FriendSearchTestPassword123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"login succeeds and saves access token\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data.accessToken).to.be.a(\"string\").and.not.empty;pm.collectionVariables.set(\"friendSearchAccessToken\",b.data.accessToken);});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Friend search rejects missing access token",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=__no-such-user-match__",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": "__no-such-user-match__" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\",()=>pm.response.to.have.status(401));",
+              "const b=pm.response.json();",
+              "pm.test(\"authentication error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.detail).eql(\"Missing access token\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Friend search rejects non-Bearer authorization",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic not-a-valid-token"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=__no-such-user-match__",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": "__no-such-user-match__" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\",()=>pm.response.to.have.status(401));",
+              "const b=pm.response.json();",
+              "pm.test(\"authentication error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.detail).eql(\"Missing access token\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Friend search rejects invalid Bearer token",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer not-a-valid-token"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=__no-such-user-match__",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": "__no-such-user-match__" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\",()=>pm.response.to.have.status(401));",
+              "const b=pm.response.json();",
+              "pm.test(\"authentication error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.detail).eql(\"Invalid refresh token\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "01 Search returns null when no active user matches",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=ZZZZZZZZ",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [{ "key": "q", "value": "ZZZZZZZZ" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope with null data\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data).eql(null);pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "02 Friend search returns an empty array when no users match",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=__no-such-user-match__",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": "__no-such-user-match__" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope with empty data\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data).eql([]);pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "03 Friend search accepts omitted query and pagination defaults",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope with array data\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data).to.be.an(\"array\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "04 Friend search accepts minimum and maximum pagination boundaries",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=__no-such-user-match__&offset=1&limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [
+            { "key": "q", "value": "__no-such-user-match__" },
+            { "key": "offset", "value": "1" },
+            { "key": "limit", "value": "50" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope with empty data\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data).eql([]);pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "05 Search rejects missing q",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "06 Search rejects empty q",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [{ "key": "q", "value": "" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "07 Search rejects whitespace-only q",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=%20%20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [{ "key": "q", "value": "  " }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "08 Search rejects q shorter than 8 characters",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=ABC1234",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [{ "key": "q", "value": "ABC1234" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "09 Search rejects q longer than 8 characters",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=ABC123456",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [{ "key": "q", "value": "ABC123456" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "10 Search rejects non-alphanumeric q",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=ABC-1234",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [{ "key": "q", "value": "ABC-1234" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "11 Search rejects repeated q parameters",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/search?q=ABC12345&q=DEF67890",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "search"],
+          "query": [
+            { "key": "q", "value": "ABC12345" },
+            { "key": "q", "value": "DEF67890" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "12 Friend search rejects empty q",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": "" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "13 Friend search rejects whitespace-only q",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=%20%20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": "  " }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "14 Friend search rejects repeated q parameters",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=first&q=second",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [
+            { "key": "q", "value": "first" },
+            { "key": "q", "value": "second" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"q\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "15 Friend search rejects non-integer or missing-value offset",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=1.5",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "offset", "value": "1.5" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "16 Friend search rejects non-numeric offset",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=abc",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "offset", "value": "abc" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "17 Friend search rejects empty offset",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "offset", "value": "" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "18 Friend search rejects offset below 1",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=0",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "offset", "value": "0" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "19 Friend search rejects negative offset",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=-1",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "offset", "value": "-1" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "20 Friend search rejects repeated offset parameters",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=1&offset=2",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [
+            { "key": "offset", "value": "1" },
+            { "key": "offset", "value": "2" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "21 Friend search rejects non-integer limit",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=1.5",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "limit", "value": "1.5" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "22 Friend search rejects non-numeric limit",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=abc",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "limit", "value": "abc" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "23 Friend search rejects empty limit",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "limit", "value": "" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "24 Friend search rejects limit below 1",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=0",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "limit", "value": "0" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "25 Friend search rejects negative limit",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=-1",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "limit", "value": "-1" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "26 Friend search rejects limit above 50",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=51",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "limit", "value": "51" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "27 Friend search rejects repeated limit parameters",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?limit=1&limit=2",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [
+            { "key": "limit", "value": "1" },
+            { "key": "limit", "value": "2" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"limit\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "28 Friend search accepts minimum limit",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=__no-such-user-match__&offset=1&limit=1",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [
+            { "key": "q", "value": "__no-such-user-match__" },
+            { "key": "offset", "value": "1" },
+            { "key": "limit", "value": "1" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope with empty data\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data).eql([]);pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "29 Friend search accepts a trimmed non-empty q",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?q=%20friend%20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "q", "value": " friend " }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.test(\"success envelope with array data\",()=>{pm.expect(b.state).eql(\"success\");pm.expect(b.error).eql(null);pm.expect(b.data).to.be.an(\"array\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "30 Friend search rejects empty offset",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{friendSearchAccessToken}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/friend/search?offset=",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "friend", "search"],
+          "query": [{ "key": "offset", "value": "" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\",()=>pm.response.to.have.status(400));",
+              "const b=pm.response.json();",
+              "pm.test(\"error envelope\",()=>{pm.expect(b.state).eql(\"error\");pm.expect(b.data).eql(null);pm.expect(b.error.code).to.be.a(\"string\").and.not.empty;pm.expect(b.error.detail).to.include(\"offset\");pm.expect(Date.parse(b.meta.timestamp)).not.be.NaN;});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ]
+}

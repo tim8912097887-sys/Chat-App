@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../utils/auth/app.js';
+import { api } from '../../utils/common/app.js';
 import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
-import { authModel, truncateAuthAndUser, userModel } from '../../utils/auth/query.js';
+import { authModel, truncateAll, userModel } from '../../utils/common/query.js';
 import { REFRESH_COOKIE_NAME, REFRESH_URL } from '../../utils/auth/constants.js';
-import { expectSuccessDataResponse } from '../../utils/common/assertion.js';
+import { expectAuthError, expectSuccessDataResponse } from '../../utils/common/assertion.js';
 import { MongoAuthRepository } from '../../../domain/auth/auth.repository.js';
 
 describe('refresh', () => {
   beforeEach(async () => {
-    await truncateAuthAndUser();
+    await truncateAll();
   });
 
   describe('success', () => {
@@ -190,15 +190,7 @@ describe('refresh', () => {
 
       const res = await request;
 
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: expectedDetail,
-        },
-        data: null,
-      });
+      expectAuthError(res, expectedDetail);
     });
   });
 

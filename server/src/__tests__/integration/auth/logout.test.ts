@@ -1,127 +1,115 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MongoAuthRepository } from "../../../domain/auth/auth.repository.js";
-import { api } from "../../utils/auth/app.js";
-import {
-  createExpiredRefreshCookie,
-  createRefreshCookie,
-} from "../../utils/auth/factory.js";
-import { authModel, truncateAuthAndUser } from "../../utils/auth/query.js";
-import { LOGOUT_URL, REFRESH_COOKIE_NAME } from "../../utils/auth/constants.js";
-import { expectSuccessMessageResponse } from "../../utils/common/assertion.js";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MongoAuthRepository } from '../../../domain/auth/auth.repository.js';
+import { api } from '../../utils/common/app.js';
+import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
+import { authModel, truncateAll } from '../../utils/common/query.js';
+import { LOGOUT_URL, REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
+import { expectAuthError, expectSuccessMessageResponse } from '../../utils/common/assertion.js';
 
-describe("logout", () => {
+describe('logout', () => {
   beforeEach(async () => {
-    await truncateAuthAndUser();
+    await truncateAll();
   });
 
-  describe("success", () => {
-    it("when logout uses an existing refresh token should revoke it and return 200 with message", async () => {
+  describe('success', () => {
+    it('when logout uses an existing refresh token should revoke it and return 200 with message', async () => {
       const { cookie, recordId } = await createRefreshCookie();
 
-      const res = await api().post(LOGOUT_URL).set("Cookie", cookie);
+      const res = await api().post(LOGOUT_URL).set('Cookie', cookie);
       const record = await authModel.findById(recordId);
 
-      expectSuccessMessageResponse(res, 200, "Logged out");
+      expectSuccessMessageResponse(res, 200, 'Logged out');
       expect(record?.revokedAt).toBeInstanceOf(Date);
       expect(record?.replacedById).toBeNull();
     });
 
-    it("when logout uses a refresh token without a stored record should return 200 with message", async () => {
+    it('when logout uses a refresh token without a stored record should return 200 with message', async () => {
       const { cookie, recordId } = await createRefreshCookie();
       await authModel.deleteOne({ _id: recordId });
 
-      const res = await api().post(LOGOUT_URL).set("Cookie", cookie);
+      const res = await api().post(LOGOUT_URL).set('Cookie', cookie);
 
-      expectSuccessMessageResponse(res, 200, "Logged out");
+      expectSuccessMessageResponse(res, 200, 'Logged out');
       expect(await authModel.findById(recordId)).toBeNull();
     });
 
-    it("when same user logout twice in a row should return 200 with message", async () => {
+    it('when same user logout twice in a row should return 200 with message', async () => {
       const { cookie } = await createRefreshCookie();
 
       const [firstRes, secondRes] = await Promise.all([
-        api().post(LOGOUT_URL).set("Cookie", cookie),
-        api().post(LOGOUT_URL).set("Cookie", cookie),
+        api().post(LOGOUT_URL).set('Cookie', cookie),
+        api().post(LOGOUT_URL).set('Cookie', cookie),
       ]);
       const authRecords = await authModel.find({});
 
-      expectSuccessMessageResponse(firstRes, 200, "Logged out");
-      expectSuccessMessageResponse(secondRes, 200, "Logged out");
+      expectSuccessMessageResponse(firstRes, 200, 'Logged out');
+      expectSuccessMessageResponse(secondRes, 200, 'Logged out');
       expect(authRecords.length).toBe(1);
       expect(authRecords[0]?.revokedAt).toBeInstanceOf(Date);
     });
   });
 
-  describe("auth error", () => {
+  describe('auth error', () => {
     it.each([
       {
         description:
-          "when logout receives an empty refresh token should return 401 with authentication error",
+          'when logout receives an empty refresh token should return 401 with authentication error',
         cookie: `${REFRESH_COOKIE_NAME}=`,
-        expectedDetail: "Missing refresh token",
+        expectedDetail: 'Missing refresh token',
       },
       {
         description:
-          "when logout receives a token under a different cookie name should return 401 with authentication error",
-        cookie: "other_refresh_token=some-token",
-        expectedDetail: "Missing refresh token",
+          'when logout receives a token under a different cookie name should return 401 with authentication error',
+        cookie: 'other_refresh_token=some-token',
+        expectedDetail: 'Missing refresh token',
       },
       {
         description:
-          "when logout receives an invalid token should return 401 with authentication error",
+          'when logout receives an invalid token should return 401 with authentication error',
         cookie: `${REFRESH_COOKIE_NAME}=not-a-valid-token`,
-        expectedDetail: "Invalid refresh token",
+        expectedDetail: 'Invalid refresh token',
       },
       {
         description:
-          "when logout receives an expired token should return 401 with authentication error",
-        cookie: "expired",
-        expectedDetail: "Invalid refresh token",
+          'when logout receives an expired token should return 401 with authentication error',
+        cookie: 'expired',
+        expectedDetail: 'Invalid refresh token',
       },
       {
         description:
-          "when logout does not receive a refresh cookie should return 401 with authentication error",
+          'when logout does not receive a refresh cookie should return 401 with authentication error',
         cookie: undefined,
-        expectedDetail: "Missing refresh token",
+        expectedDetail: 'Missing refresh token',
       },
-    ])("$description", async ({ cookie, expectedDetail }) => {
-      const cookieHeader =
-        cookie === "expired" ? await createExpiredRefreshCookie() : cookie;
+    ])('$description', async ({ cookie, expectedDetail }) => {
+      const cookieHeader = cookie === 'expired' ? await createExpiredRefreshCookie() : cookie;
       const request = api().post(LOGOUT_URL);
-      if (cookieHeader !== undefined) request.set("Cookie", cookieHeader);
+      if (cookieHeader !== undefined) request.set('Cookie', cookieHeader);
 
       const res = await request;
 
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: "error",
-        error: {
-          code: "UnauthenticationError",
-          detail: expectedDetail,
-        },
-        data: null,
-      });
+      expectAuthError(res, expectedDetail);
     });
   });
 
-  describe("server error", () => {
-    it("when auth repository fails during logout should return 500 with server error", async () => {
+  describe('server error', () => {
+    it('when auth repository fails during logout should return 500 with server error', async () => {
       // Arrange
       const { cookie } = await createRefreshCookie();
       const invalidateRefreshTokenSpy = vi
-        .spyOn(MongoAuthRepository.prototype, "invalidateRefreshToken")
-        .mockRejectedValue(new Error("database unavailable"));
+        .spyOn(MongoAuthRepository.prototype, 'invalidateRefreshToken')
+        .mockRejectedValue(new Error('database unavailable'));
 
       // Act
-      const res = await api().post(LOGOUT_URL).set("Cookie", cookie);
+      const res = await api().post(LOGOUT_URL).set('Cookie', cookie);
 
       // Assert
       expect(res.status).toBe(500);
       expect(res.body).toMatchObject({
-        state: "error",
+        state: 'error',
         error: {
-          code: "SERVER_ERROR",
-          detail: "An unexpected error occurred. Please try again later.",
+          code: 'SERVER_ERROR',
+          detail: 'An unexpected error occurred. Please try again later.',
         },
         data: null,
       });

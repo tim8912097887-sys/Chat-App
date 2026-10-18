@@ -17,6 +17,29 @@ export interface User {
   updatedAt: Date;
 }
 
+export interface UserSearchRecord {
+  _id: string;
+  name: string;
+  imageUrl: string | null;
+}
+
+export interface PublicUser {
+  id: string;
+  name: string;
+  image: string | null;
+}
+
+export interface PaginationOptions {
+  name?: string;
+  offset: number;
+  limit: number;
+}
+
+export interface UserIdentity {
+  userId: string;
+  tokenVersion: number;
+}
+
 export interface CreateUserInput {
   name: string;
   email: string;

@@ -1,14 +1,8 @@
-import {
-  createUserContainer,
-  UserContainer,
-} from "./domain/user/user.container.js";
-import {
-  AuthContainer,
-  createAuthContainer,
-} from "./domain/auth/auth.container.js";
-import { JoseTokenService } from "./domain/auth/util/token-validator.js";
-import { config } from "./config/env/index.js";
-import { createPasswordHasher } from "./domain/auth/util/password-hasher.js";
+import { createUserContainer, UserContainer } from './domain/user/user.container.js';
+import { AuthContainer, createAuthContainer } from './domain/auth/auth.container.js';
+import { JoseTokenService } from './domain/auth/util/token-validator.js';
+import { config } from './config/env/index.js';
+import { createPasswordHasher } from './domain/auth/util/password-hasher.js';
 
 export interface AppContainer {
   user: UserContainer;
@@ -20,7 +14,9 @@ export const buildContainer = (): AppContainer => {
   const passwordHasher = createPasswordHasher(config.password.bcryptCost);
   const tokenService = new JoseTokenService(config.jwt);
 
-  const user = createUserContainer();
+  const user = createUserContainer({
+    tokenService,
+  });
   const auth = createAuthContainer({
     config,
     userService: user.userService,

@@ -7,9 +7,12 @@ import { InvalidImageError } from '../../../domain/auth/error/invalid-image.js';
 import { InvalidTokenError } from '../../../domain/auth/error/invalid-token.js';
 import { LoginLockedError } from '../../../domain/auth/error/login-locked.js';
 import { DomainError } from '../../../domain/error/domain.js';
+import { InvalidUserTokenError } from '../../../domain/user/error/invalid-user-token.js';
 
 export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefined => {
   if (error instanceof InvalidTokenError) {
+    return new UnauthenticationError(error.message);
+  } else if (error instanceof InvalidUserTokenError) {
     return new UnauthenticationError(error.message);
   } else if (error instanceof InvalidCredentialError) {
     return new BadRequestError(error.message);

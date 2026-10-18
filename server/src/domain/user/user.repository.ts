@@ -2,13 +2,17 @@ import type {
   CreateUserRecord,
   CreateUserResult,
   FailedLoginResult,
-} from "./user.types.js";
-import type { UserDocument, UserModel } from "./user.model.js";
-import { isDuplicateKeyError } from "./user.utils.js";
+  PaginationOptions,
+  UserSearchRecord,
+} from './user.types.js';
+import type { UserDocument, UserModel } from './user.model.js';
+import { isDuplicateKeyError } from './user.utils.js';
 
 export interface UserRepository {
   findById(id: string): Promise<UserDocument | null>;
   findByEmail(email: string): Promise<UserDocument | null>;
+  findActiveBySearchCode(searchCode: string): Promise<UserSearchRecord | null>;
+  searchFriendByName(friendsId: string[], options: PaginationOptions): Promise<UserSearchRecord[]>;
   create(record: CreateUserRecord): Promise<CreateUserResult>;
   /** Atomically bumps the attempt counter; locks the account and resets the counter at the limit. */
   registerFailedLogin(
@@ -28,11 +32,42 @@ export class MongoUserRepository implements UserRepository {
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
+    const doc = await this.userModel.findOne({ email }).lean<UserDocument>().exec();
+    return doc ? doc : null;
+  }
+
+  async findActiveBySearchCode(searchCode: string): Promise<UserSearchRecord | null> {
     const doc = await this.userModel
-      .findOne({ email })
-      .lean<UserDocument>()
+      .findOne({ searchCode, status: 'ACTIVE' })
+      .select({ _id: 1, name: 1, imageUrl: 1 })
+      .lean<UserSearchRecord | null>()
       .exec();
     return doc ? doc : null;
+  }
+
+  async searchFriendByName(
+    friendsId: string[],
+    options: {
+      name?: string;
+      offset: number;
+      limit: number;
+    },
+  ): Promise<UserSearchRecord[]> {
+    const { name, offset, limit } = options;
+    const filter = {
+      status: 'ACTIVE' as const,
+      _id: { $in: friendsId },
+      ...(name && { name: { $regex: name, $options: 'i' } }),
+    };
+
+    return this.userModel
+      .find(filter)
+      .select({ _id: 1, name: 1, imageUrl: 1 })
+      .sort({ name: 1, _id: 1 })
+      .skip(offset)
+      .limit(limit)
+      .lean<UserSearchRecord[]>()
+      .exec();
   }
 
   async create(record: CreateUserRecord): Promise<CreateUserResult> {
@@ -44,14 +79,12 @@ export class MongoUserRepository implements UserRepository {
         imageUrl: record.imageUrl ?? null,
         searchCode: record.searchCode,
       });
-      return { status: "CREATED", user: doc.toObject() };
+      return { status: 'CREATED', user: doc.toObject() };
     } catch (err) {
       if (isDuplicateKeyError(err)) {
         // Don't depend on driver-specific error metadata; just check whether the email is the culprit.
         const existing = await this.findByEmail(record.email);
-        return existing
-          ? { status: "EMAIL_TAKEN" }
-          : { status: "SEARCH_CODE_TAKEN" };
+        return existing ? { status: 'EMAIL_TAKEN' } : { status: 'SEARCH_CODE_TAKEN' };
       }
       throw err;
     }
@@ -101,19 +134,11 @@ export class MongoUserRepository implements UserRepository {
 
   async clearLoginState(id: string): Promise<void> {
     await this.userModel
-      .updateOne(
-        { _id: id },
-        { $set: { loginAttempt: 0, loginLockedAt: null } },
-      )
+      .updateOne({ _id: id }, { $set: { loginAttempt: 0, loginLockedAt: null } })
       .exec();
   }
 
   async incrementTokenVersion(id: string, tokenVersion: number): Promise<void> {
-    await this.userModel
-      .updateOne(
-        { _id: id, tokenVersion },
-        { $inc: { tokenVersion: 1 } },
-      )
-      .exec();
+    await this.userModel.updateOne({ _id: id, tokenVersion }, { $inc: { tokenVersion: 1 } }).exec();
   }
 }
