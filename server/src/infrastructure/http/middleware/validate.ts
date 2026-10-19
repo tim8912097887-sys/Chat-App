@@ -29,3 +29,16 @@ export const validateQueryParams =
     req.body = result.data;
     next();
   };
+
+export const validatePathParams =
+  <S extends z.ZodType>(schema: S): RequestHandler =>
+  (req, _res, next) => {
+    const result = schema.safeParse(req.params);
+    if (!result.success) {
+      const detail = result.error.issues
+        .map((i) => `${i.path.join('.') || 'params'}: ${i.message}`)
+        .join('; ');
+      throw new BadRequestError(detail);
+    }
+    next();
+  };

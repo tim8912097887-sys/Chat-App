@@ -10,6 +10,7 @@ import { errorHandler } from './infrastructure/http/middleware/error-handler.js'
 import { AppContainer } from './container.js';
 import { createAuthRouter } from './domain/auth/auth.route.js';
 import { createUserRouter } from './domain/user/user.route.js';
+import { createRelationshipRouter } from './domain/relationship/relationship.route.js';
 
 export const createApp = (container: AppContainer): Express => {
   const app = express();
@@ -36,6 +37,13 @@ export const createApp = (container: AppContainer): Express => {
     createUserRouter({
       controller: container.user.userController,
       accessTokenMiddleware: container.user.accessTokenMiddleware,
+    }),
+  );
+  app.use(
+    '/api/v1/friend-requests',
+    createRelationshipRouter({
+      controller: container.relationship.relationshipController,
+      accessTokenMiddleware: container.relationship.accessTokenMiddleware,
     }),
   );
 

@@ -3,14 +3,16 @@ import type {
   CreateUserResult,
   FailedLoginResult,
   PaginationOptions,
+  PublicUserRecord,
   UserSearchRecord,
 } from './user.types.js';
 import type { UserDocument, UserModel } from './user.model.js';
-import { isDuplicateKeyError } from './user.utils.js';
+import { isDuplicateKeyError } from '../../shared/utils/error.js';
 
 export interface UserRepository {
   findById(id: string): Promise<UserDocument | null>;
   findByEmail(email: string): Promise<UserDocument | null>;
+  findPublicUsersByIds(userIds: string[]): Promise<PublicUserRecord[]>;
   findActiveBySearchCode(searchCode: string): Promise<UserSearchRecord | null>;
   searchFriendByName(friendsId: string[], options: PaginationOptions): Promise<UserSearchRecord[]>;
   create(record: CreateUserRecord): Promise<CreateUserResult>;
@@ -36,6 +38,15 @@ export class MongoUserRepository implements UserRepository {
     return doc ? doc : null;
   }
 
+  async findPublicUsersByIds(userIds: string[]): Promise<PublicUserRecord[]> {
+    if (userIds.length === 0) return [];
+    return this.userModel
+      .find({ _id: { $in: userIds }, status: 'ACTIVE' })
+      .select({ _id: 1, name: 1, imageUrl: 1 })
+      .lean<PublicUserRecord[]>()
+      .exec();
+  }
+
   async findActiveBySearchCode(searchCode: string): Promise<UserSearchRecord | null> {
     const doc = await this.userModel
       .findOne({ searchCode, status: 'ACTIVE' })
@@ -47,13 +58,9 @@ export class MongoUserRepository implements UserRepository {
 
   async searchFriendByName(
     friendsId: string[],
-    options: {
-      name?: string;
-      offset: number;
-      limit: number;
-    },
+    options: PaginationOptions,
   ): Promise<UserSearchRecord[]> {
-    const { name, offset, limit } = options;
+    const { name, page, limit } = options;
     const filter = {
       status: 'ACTIVE' as const,
       _id: { $in: friendsId },
@@ -64,7 +71,7 @@ export class MongoUserRepository implements UserRepository {
       .find(filter)
       .select({ _id: 1, name: 1, imageUrl: 1 })
       .sort({ name: 1, _id: 1 })
-      .skip(offset)
+      .skip(page)
       .limit(limit)
       .lean<UserSearchRecord[]>()
       .exec();

@@ -3,7 +3,11 @@ import { api } from '../../utils/common/app.js';
 import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
 import { truncateAll, userModel } from '../../utils/common/query.js';
 import { LOGOUT_ALL_URL, REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
-import { expectAuthError, expectSuccessMessageResponse } from '../../utils/common/assertion.js';
+import {
+  expectAuthError,
+  expectServerError,
+  expectSuccessMessageResponse,
+} from '../../utils/common/assertion.js';
 import { MongoUserRepository } from '../../../domain/user/user.repository.js';
 
 describe('logout-all', () => {
@@ -151,15 +155,7 @@ describe('logout-all', () => {
       const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
 
       // Assert
-      expect(res.status).toBe(500);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'SERVER_ERROR',
-          detail: 'An unexpected error occurred. Please try again later.',
-        },
-        data: null,
-      });
+      expectServerError(res);
       expect(invalidateRefreshTokenSpy).toHaveBeenCalledOnce();
     });
   });

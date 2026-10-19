@@ -46,7 +46,7 @@ export class UserService {
       throw new InvalidUserTokenError('Invalid user token');
     }
 
-    const relationships = await this.relationshipRepository.findById(identity.userId);
+    const relationships = await this.relationshipRepository.findFriendsByUserId(identity.userId);
     const friendsId = relationships
       .map((relationship) => relationship.userIds.find((id) => id !== identity.userId))
       .filter((id): id is string => id !== undefined);
@@ -54,7 +54,7 @@ export class UserService {
     if (friendsId.length === 0) return [];
     const users = await this.userRepository.searchFriendByName(friendsId, {
       name: pagination.name,
-      offset: (pagination.offset - 1) * pagination.limit,
+      page: (pagination.page - 1) * pagination.limit,
       limit: pagination.limit,
     });
     return users.map((user) => this.toPublicUser(user));
@@ -110,7 +110,7 @@ export class UserService {
     return {
       id: user._id.toString(),
       name: user.name,
-      image: user.imageUrl ?? null,
+      imageUrl: user.imageUrl ?? null,
     };
   }
 }

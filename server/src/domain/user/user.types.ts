@@ -23,15 +23,21 @@ export interface UserSearchRecord {
   imageUrl: string | null;
 }
 
+export interface PublicUserRecord {
+  _id: string;
+  name: string;
+  imageUrl: string | null;
+}
+
 export interface PublicUser {
   id: string;
   name: string;
-  image: string | null;
+  imageUrl: string | null;
 }
 
 export interface PaginationOptions {
   name?: string;
-  offset: number;
+  page: number;
   limit: number;
 }
 

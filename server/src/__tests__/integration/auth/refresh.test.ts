@@ -3,7 +3,11 @@ import { api } from '../../utils/common/app.js';
 import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
 import { authModel, truncateAll, userModel } from '../../utils/common/query.js';
 import { REFRESH_COOKIE_NAME, REFRESH_URL } from '../../utils/auth/constants.js';
-import { expectAuthError, expectSuccessDataResponse } from '../../utils/common/assertion.js';
+import {
+  expectAuthError,
+  expectServerError,
+  expectSuccessDataResponse,
+} from '../../utils/common/assertion.js';
 import { MongoAuthRepository } from '../../../domain/auth/auth.repository.js';
 
 describe('refresh', () => {
@@ -207,15 +211,7 @@ describe('refresh', () => {
       const token = await authModel.findOne({});
 
       // Assert
-      expect(res.status).toBe(500);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'SERVER_ERROR',
-          detail: 'An unexpected error occurred. Please try again later.',
-        },
-        data: null,
-      });
+      expectServerError(res);
       expect(invalidateRefreshTokenSpy).toHaveBeenCalledOnce();
       expect(token?.revokedAt).toBeNull();
     });

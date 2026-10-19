@@ -11,10 +11,10 @@ export const searchCodeQuerySchema = z.object({
 
 export const friendSearchQuerySchema = z.object({
   q: z.string('q must be a string').trim().min(1, 'q must not be empty').optional(),
-  offset: z.coerce
-    .number('offset must be a number')
-    .int('offset must be an integer')
-    .min(1, `offset must be at least 1`)
+  page: z.coerce
+    .number('page must be a number')
+    .int('page must be an integer')
+    .min(1, `page must be at least 1`)
     .default(1),
   limit: z.coerce
     .number('limit must be a number')

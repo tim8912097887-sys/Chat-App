@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../utils/common/app.js';
 import { LOGOUT_ALL_URL, SIGNUP_URL } from '../../utils/auth/constants.js';
-import { truncateAll, userModel } from '../../utils/common/query.js';
+import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
 import {
   expectAuthError,
+  expectServerError,
   expectSuccessDataResponse,
   expectValidationError,
 } from '../../utils/common/assertion.js';
@@ -16,12 +17,9 @@ import {
   invalidSearchQueries,
 } from '../../utils/user/invalid-inputs.js';
 import { friendSearchRequest, signupAndLogin } from '../../utils/user/query.js';
+import { acceptRelationship, inviteFriend } from '../../utils/relationship/query.js';
 
 describe('user search', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   beforeEach(async () => {
     await truncateAll();
   });
@@ -72,7 +70,7 @@ describe('user search', () => {
       expectSuccessDataResponse(response, 200, {
         id: expect.any(String),
         name: expect.any(String),
-        image: null,
+        imageUrl: null,
       });
     });
 
@@ -82,6 +80,57 @@ describe('user search', () => {
       const response = await friendSearchRequest(accessToken);
 
       expectSuccessDataResponse(response, 200, []);
+    });
+
+    it('when searching friends by name across pages should return distinct matching friends', async () => {
+      const { accessToken: ownerAccessToken, email: ownerEmail } = await signupAndLogin();
+      const owner = await userModel.findOne({ email: ownerEmail });
+      expect(owner).not.toBeNull();
+      const friends: Array<{ id: string; name: string; imageUrl: null }> = [];
+
+      for (const suffix of ['A', 'B', 'C']) {
+        const { accessToken: friendAccessToken, email } = await signupAndLogin();
+        const friend = await userModel.findOneAndUpdate(
+          { email },
+          { $set: { name: `Pagination Friend ${suffix}` } },
+          { returnDocument: 'after' },
+        );
+        expect(friend).not.toBeNull();
+
+        const inviteResponse = await inviteFriend(ownerAccessToken, friend!._id.toString());
+        expect(inviteResponse.status).toBe(201);
+        const request = await friendshipModel.findOne({
+          userIds: { $all: [owner!._id.toString(), friend!._id.toString()], $size: 2 },
+        });
+        expect(request).not.toBeNull();
+        const acceptResponse = await acceptRelationship(friendAccessToken, request!._id.toString());
+        expect(acceptResponse.status).toBe(200);
+
+        friends.push({
+          id: friend!._id.toString(),
+          name: friend!.name,
+          imageUrl: null,
+        });
+      }
+
+      const firstPage = await friendSearchRequest(ownerAccessToken).query({
+        q: 'Pagination Friend',
+        page: 1,
+        limit: 2,
+      });
+      const secondPage = await friendSearchRequest(ownerAccessToken).query({
+        q: 'Pagination Friend',
+        page: 2,
+        limit: 2,
+      });
+
+      expectSuccessDataResponse(firstPage, 200, friends.slice(0, 2));
+      expectSuccessDataResponse(secondPage, 200, friends.slice(2));
+      expect(
+        firstPage.body.data.some((first: { id: string }) =>
+          secondPage.body.data.some((second: { id: string }) => second.id === first.id),
+        ),
+      ).toBe(false);
     });
   });
 
@@ -172,34 +221,18 @@ describe('user search', () => {
 
       const response = await api().get(USER_SEARCH_URL).query({ q: '12345678' });
 
-      expect(response.status).toBe(500);
-      expect(response.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'SERVER_ERROR',
-          detail: 'An unexpected error occurred. Please try again later.',
-        },
-        data: null,
-      });
+      expectServerError(response);
     });
 
     it('when relationship repository fails during friend search should return 500 with server error', async () => {
       const { accessToken } = await signupAndLogin();
       const relationshipRepositorySpy = vi
-        .spyOn(MongoRelationshipRepository.prototype, 'findById')
+        .spyOn(MongoRelationshipRepository.prototype, 'findFriendsByUserId')
         .mockRejectedValue(new Error('database unavailable'));
 
       const response = await friendSearchRequest(accessToken);
 
-      expect(response.status).toBe(500);
-      expect(response.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'SERVER_ERROR',
-          detail: 'An unexpected error occurred. Please try again later.',
-        },
-        data: null,
-      });
+      expectServerError(response);
       expect(relationshipRepositorySpy).toHaveBeenCalledOnce();
     });
   });
