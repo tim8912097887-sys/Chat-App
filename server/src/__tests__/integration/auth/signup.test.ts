@@ -5,6 +5,7 @@ import { SIGNUP_URL } from '../../utils/auth/constants.js';
 import { truncateAll, userRepository } from '../../utils/common/query.js';
 import { beforeEach } from 'vitest';
 import {
+  expectServerError,
   expectSuccessMessageResponse,
   expectValidationError,
 } from '../../utils/common/assertion.js';
@@ -169,15 +170,7 @@ describe('signup', () => {
         .post(SIGNUP_URL)
         .send(signupUserInput({ email: 'server-error@example.com' }));
 
-      expect(res.status).toBe(500);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'SERVER_ERROR',
-          detail: 'An unexpected error occurred. Please try again later.',
-        },
-        data: null,
-      });
+      expectServerError(res);
     });
   });
 });

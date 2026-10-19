@@ -13,8 +13,10 @@ const friendshipSchema = new Schema(
     userIds: {
       type: [String],
       validate: {
-        validator: function (v: string[]) {
-          return v.length === 2;
+        validator: function (this: { requestedBy: string }, v: string[]) {
+          let isValid = true;
+          if (v.length !== 2 || !v.includes(this.requestedBy) || v[0] === v[1]) isValid = false;
+          return isValid;
         },
         message: 'Friendship must have exactly two users',
       },
@@ -29,9 +31,18 @@ const friendshipSchema = new Schema(
       },
       required: true,
     },
+    pairKey: {
+      type: String,
+      required: true,
+      unique: true,
+    },
   },
   { collection: 'friendships', timestamps: true, versionKey: false },
 );
+
+friendshipSchema.index({ userIds: 1, status: 1, updatedAt: -1, _id: 1 });
+
+friendshipSchema.index({ userIds: 1, requestedBy: 1, status: 1, updatedAt: -1, _id: 1 });
 
 export function registerFriendshipsModel(): FriendshipModel {
   return (

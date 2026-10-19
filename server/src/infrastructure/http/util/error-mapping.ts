@@ -7,6 +7,9 @@ import { InvalidImageError } from '../../../domain/auth/error/invalid-image.js';
 import { InvalidTokenError } from '../../../domain/auth/error/invalid-token.js';
 import { LoginLockedError } from '../../../domain/auth/error/login-locked.js';
 import { DomainError } from '../../../domain/error/domain.js';
+import { FriendshipAlreadyExistError } from '../../../domain/relationship/error/friendship-already-exist.js';
+import { InvalidFriendshipChangeError } from '../../../domain/relationship/error/invalid-friendship-change.js';
+import { SendFriendRequestToSelfError } from '../../../domain/relationship/error/send-friend-request-to-self.js';
 import { InvalidUserTokenError } from '../../../domain/user/error/invalid-user-token.js';
 
 export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefined => {
@@ -20,6 +23,12 @@ export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefin
     return new ServerConflictError(error.message);
   } else if (error instanceof InvalidImageError) {
     return new BadRequestError(error.message);
+  } else if (error instanceof FriendshipAlreadyExistError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof InvalidFriendshipChangeError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof SendFriendRequestToSelfError) {
+    return new ServerConflictError(error.message);
   } else {
     return undefined;
   }

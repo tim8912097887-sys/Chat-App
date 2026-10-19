@@ -32,3 +32,25 @@ export function expectAuthError(response: Response, expectedDetail: string) {
   });
   expect(response.body.error.detail).toContain(expectedDetail);
 }
+
+export function expectServerError(response: Response) {
+  expect(response.status).toBe(500);
+  expect(response.body).toMatchObject({
+    state: 'error',
+    error: { code: 'SERVER_ERROR' },
+    data: null,
+  });
+  expect(response.body.error.detail).toContain(
+    'An unexpected error occurred. Please try again later.',
+  );
+}
+
+export function expectServerConflictError(response: Response, expectedDetail: string) {
+  expect(response.status).toBe(409);
+  expect(response.body).toMatchObject({
+    state: 'error',
+    error: { code: 'ServerConflictError' },
+    data: null,
+  });
+  expect(response.body.error.detail).toContain(expectedDetail);
+}

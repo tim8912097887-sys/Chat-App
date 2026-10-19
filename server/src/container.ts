@@ -3,10 +3,15 @@ import { AuthContainer, createAuthContainer } from './domain/auth/auth.container
 import { JoseTokenService } from './domain/auth/util/token-validator.js';
 import { config } from './config/env/index.js';
 import { createPasswordHasher } from './domain/auth/util/password-hasher.js';
+import {
+  createRelationshipContainer,
+  RelationshipContainer,
+} from './domain/relationship/relationship.container.js';
 
 export interface AppContainer {
   user: UserContainer;
   auth: AuthContainer;
+  relationship: RelationshipContainer;
 }
 
 /** Composition root: the only place where concrete implementations are wired together. */
@@ -23,6 +28,10 @@ export const buildContainer = (): AppContainer => {
     tokenService,
     passwordHasher,
   });
+  const relationship = createRelationshipContainer({
+    userRepository: user.userRepository,
+    tokenService,
+  });
 
-  return { user, auth };
+  return { user, auth, relationship };
 };
