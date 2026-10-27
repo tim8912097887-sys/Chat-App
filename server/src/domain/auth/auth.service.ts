@@ -12,6 +12,7 @@ import { RefreshTokenInput, TokenPayload, TokenService } from './util/token-vali
 import { AuthTokens } from './dto/token.js';
 import { CloudinaryImageStorage, StoredImage } from './image.service.js';
 import { logger } from '../../config/logger/logger.js';
+import { PresenceService } from '../../realtime/presence.service.js';
 
 export interface AuthServiceOptions {
   maxLoginAttempts: number;
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly passwordHasher: PasswordHasher,
     private readonly options: AuthServiceOptions,
+    private readonly presenceService: PresenceService,
   ) {}
 
   /**
@@ -103,7 +105,8 @@ export class AuthService {
     }
 
     const tokens = await this.issueTokens(user);
-    await this.createRefreshTokenRecord(tokens.refreshToken, randomUUID());
+    await this.createRefreshTokenRecord(tokens.refreshToken, randomUUID(), user.id);
+
     return tokens;
   }
 
@@ -137,6 +140,7 @@ export class AuthService {
       newTokenHash: this.hashRefreshToken(tokens.refreshToken),
       replacedById,
       familyId: parent.familyId,
+      userId: user.id,
       parentId: parent._id,
       expiredAt: new Date(Date.now() + this.options.refreshTtlSeconds * 1000),
     });
@@ -154,6 +158,8 @@ export class AuthService {
   async logoutAll(token: TokenPayload): Promise<void> {
     const user = await this.requireValidSession(token);
     await this.userService.incrementTokenVersion(user.id, token.tokenVersion);
+    await this.authRepository.invalidateAllRefreshTokensByUserId(user.id);
+    this.presenceService.disconnectUser(user.id);
   }
 
   /** The user must exist, be active, and the token must carry the current token version. */
@@ -180,6 +186,7 @@ export class AuthService {
   private async createRefreshTokenRecord(
     refreshToken: string,
     id: string,
+    userId: string,
     parent?: { id: string; familyId: string } | null,
   ): Promise<void> {
     const expiredAt = new Date(Date.now() + this.options.refreshTtlSeconds * 1000);
@@ -187,6 +194,7 @@ export class AuthService {
     await this.authRepository.createRefreshToken({
       id,
       familyId: parent?.familyId ?? randomUUID(),
+      userId,
       tokenHash: this.hashRefreshToken(refreshToken),
       parentId: parent?.id ?? null,
       expiredAt,

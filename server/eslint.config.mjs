@@ -38,7 +38,7 @@ export default defineConfig(
       '@typescript-eslint/restrict-template-expressions': 'off', // Allows ${number} or${boolean} in template literals
       '@typescript-eslint/no-extraneous-class': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off', // Allows using `!` operator when you know a value exists
-
+      '@typescript-eslint/no-unsafe-member-access': 'off',
       // Smooth handling for async event handlers (e.g. onClick={async () => ...})
       '@typescript-eslint/no-misused-promises': [
         'error',

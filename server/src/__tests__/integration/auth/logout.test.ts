@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MongoAuthRepository } from '../../../domain/auth/auth.repository.js';
-import { api } from '../../utils/common/app.js';
+import { api, mockedRealtimePublisher } from '../../utils/common/app.js';
 import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
 import { authModel, truncateAll } from '../../utils/common/query.js';
 import { LOGOUT_URL, REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
@@ -9,6 +9,8 @@ import {
   expectServerError,
   expectSuccessMessageResponse,
 } from '../../utils/common/assertion.js';
+import { realtimeEventAssertion } from '../../utils/common/realtime.js';
+import { FRIEND_OFFLINE_EVENT } from '../../../realtime/realtime.constants.js';
 
 describe('logout', () => {
   beforeEach(async () => {
@@ -25,6 +27,7 @@ describe('logout', () => {
       expectSuccessMessageResponse(res, 200, 'Logged out');
       expect(record?.revokedAt).toBeInstanceOf(Date);
       expect(record?.replacedById).toBeNull();
+      expect(record?.userId).toBeTruthy();
     });
 
     it('when logout uses a refresh token without a stored record should return 200 with message', async () => {
@@ -99,7 +102,8 @@ describe('logout', () => {
   describe('server error', () => {
     it('when auth repository fails during logout should return 500 with server error', async () => {
       // Arrange
-      const { cookie } = await createRefreshCookie();
+      const { cookie, recordId } = await createRefreshCookie();
+      const userId = (await authModel.findById(recordId))?.userId;
       const invalidateRefreshTokenSpy = vi
         .spyOn(MongoAuthRepository.prototype, 'invalidateRefreshToken')
         .mockRejectedValue(new Error('database unavailable'));
@@ -110,6 +114,10 @@ describe('logout', () => {
       // Assert
       expectServerError(res);
       expect(invalidateRefreshTokenSpy).toHaveBeenCalledOnce();
+      expect(mockedRealtimePublisher.publishToUsers).not.toHaveBeenCalledWith(
+        [],
+        realtimeEventAssertion(FRIEND_OFFLINE_EVENT, { userId }),
+      );
     });
   });
 });

@@ -13,11 +13,13 @@ import type {
   UserSearchRecord,
 } from './user.types.js';
 import { generateSearchCode } from './user.utils.js';
+import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
 
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly relationshipRepository: RelationshipRepository,
+    private readonly realtimeEvents: RealtimeEventPublisher,
   ) {}
 
   async findById(id: string): Promise<User | null> {
@@ -40,7 +42,7 @@ export class UserService {
   async searchFriendsByName(
     identity: UserIdentity,
     pagination: PaginationOptions,
-  ): Promise<PublicUser[]> {
+  ): Promise<(PublicUser & { isOnline: boolean })[]> {
     const user = await this.userRepository.findById(identity.userId);
     if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== identity.tokenVersion) {
       throw new InvalidUserTokenError('Invalid user token');
@@ -57,7 +59,17 @@ export class UserService {
       page: (pagination.page - 1) * pagination.limit,
       limit: pagination.limit,
     });
-    return users.map((user) => this.toPublicUser(user));
+
+    const userDto = [];
+
+    for (const user of users) {
+      const isOnline = await this.realtimeEvents.isUserOnline(user._id.toString());
+      userDto.push({
+        ...this.toPublicUser(user),
+        isOnline,
+      });
+    }
+    return userDto;
   }
 
   /** Returns true when a user was created, false when the email was already registered. */
@@ -91,7 +103,7 @@ export class UserService {
 
   private toUserDomain(userDocument: UserDocument): User {
     return {
-      id: userDocument._id,
+      id: userDocument._id.toString(),
       name: userDocument.name,
       email: userDocument.email,
       passwordHash: userDocument.passwordHash,

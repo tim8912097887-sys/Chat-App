@@ -11,11 +11,19 @@ import { PublicUserRecord } from '../user/user.types.js';
 import { SendFriendRequestToSelfError } from './error/send-friend-request-to-self.js';
 import { FriendshipAlreadyExistError } from './error/friendship-already-exist.js';
 import { InvalidFriendshipChangeError } from './error/invalid-friendship-change.js';
+import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
+import { createRealtimeEvent } from '../../realtime/realtime.types.js';
+import {
+  FRIEND_REQUEST_ACCEPTED_EVENT,
+  FRIEND_REQUEST_CREATED_EVENT,
+  FRIEND_REQUEST_REJECTED_EVENT,
+} from '../../realtime/realtime.constants.js';
 
 export class RelationshipService {
   constructor(
     private readonly relationshipRepository: RelationshipRepository,
     private readonly userRepository: UserRepository,
+    private readonly realtimeEvents: RealtimeEventPublisher,
   ) {}
 
   async getFriendRequests(
@@ -43,7 +51,7 @@ export class RelationshipService {
 
       return [
         {
-          id: request._id.toString(),
+          requestId: request._id.toString(),
           name: user.name,
           imageUrl: user.imageUrl ?? null,
         },
@@ -55,7 +63,7 @@ export class RelationshipService {
     identity: FriendRequestIdentity,
     input: CreateFriendRequestInput,
   ): Promise<void> {
-    await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
+    const requester = await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
     if (identity.userId === input.targetUserId) {
       throw new SendFriendRequestToSelfError('A user cannot send a friend request to themselves');
     }
@@ -71,15 +79,40 @@ export class RelationshipService {
           existing._id,
           identity.userId,
         );
-        if (reopened) return;
+        if (reopened) {
+          this.realtimeEvents.publishToUser(
+            input.targetUserId,
+            createRealtimeEvent(FRIEND_REQUEST_CREATED_EVENT, {
+              requestId: reopened._id.toString(),
+              requester: {
+                id: requester._id.toString(),
+                name: requester.name,
+                imageUrl: requester.imageUrl ?? null,
+              },
+            }),
+          );
+          return;
+        }
       }
       throw new FriendshipAlreadyExistError('A friend request or friendship already exists');
     }
 
-    await this.relationshipRepository.createFriendRequest(
+    const friendRequest = await this.relationshipRepository.createFriendRequest(
       identity.userId,
       input.targetUserId,
       pairKey,
+    );
+
+    this.realtimeEvents.publishToUser(
+      input.targetUserId,
+      createRealtimeEvent(FRIEND_REQUEST_CREATED_EVENT, {
+        requestId: friendRequest._id.toString(),
+        requester: {
+          id: requester._id.toString(),
+          name: requester.name,
+          imageUrl: requester.imageUrl ?? null,
+        },
+      }),
     );
   }
 
@@ -96,7 +129,7 @@ export class RelationshipService {
     requestId: string,
     status: 'ACCEPTED' | 'REJECTED',
   ): Promise<void> {
-    await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
+    const user = await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
     const request = await this.relationshipRepository.findPendingRequestById(requestId);
     if (
       !request ||
@@ -109,6 +142,20 @@ export class RelationshipService {
     await this.getVerifiedActiveUser(request.requestedBy);
     const updated = await this.relationshipRepository.updatePendingRequestStatus(requestId, status);
     if (!updated) throw new InvalidFriendshipChangeError('Friend request is no longer pending');
+
+    const eventStatus =
+      status === 'ACCEPTED' ? FRIEND_REQUEST_ACCEPTED_EVENT : FRIEND_REQUEST_REJECTED_EVENT;
+    this.realtimeEvents.publishToUser(
+      request.requestedBy,
+      createRealtimeEvent(eventStatus, {
+        requestId: request._id.toString(),
+        actor: {
+          id: user._id.toString(),
+          name: user.name,
+          imageUrl: user.imageUrl ?? null,
+        },
+      }),
+    );
   }
 
   private async getVerifiedActiveUser(userId: string, tokenVersion?: number) {

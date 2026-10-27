@@ -1,6 +1,7 @@
 export interface CreateRefreshTokenRecord {
   id: string;
   familyId: string;
+  userId: string;
   tokenHash: string;
   parentId: string | null;
   expiredAt: Date;
@@ -11,6 +12,7 @@ export type TokenRecord = {
   familyId: string;
   revokedAt: Date | null;
   replacedById: string | null;
+  expiredAt: Date;
 };
 
 export type InvalidateTokenRecord = {
@@ -21,6 +23,7 @@ export type InvalidateTokenRecord = {
 export type AtomicRefreshTokenRecord = {
   parentId: string;
   familyId: string;
+  userId: string;
   tokenHash: string;
   newTokenHash: string;
   replacedById: string;

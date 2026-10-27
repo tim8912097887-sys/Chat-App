@@ -9,6 +9,7 @@ import { AppConfig } from '../../config/env/index.js';
 import { getRefreshTokenModel } from './auth.model.js';
 import { MongoAuthRepository } from './auth.repository.js';
 import { CloudinaryImageStorage } from './image.service.js';
+import { PresenceService } from '../../realtime/presence.service.js';
 
 export interface AuthContainer {
   authService: AuthService;
@@ -21,10 +22,11 @@ export interface AuthContainerDeps {
   userService: UserService;
   tokenService: TokenService;
   passwordHasher: PasswordHasher;
+  presenceService: PresenceService;
 }
 
 export const createAuthContainer = (deps: AuthContainerDeps): AuthContainer => {
-  const { config, userService, tokenService, passwordHasher } = deps;
+  const { config, userService, tokenService, passwordHasher, presenceService } = deps;
   const authRepository = new MongoAuthRepository(getRefreshTokenModel());
 
   const imageService = new CloudinaryImageStorage();
@@ -39,6 +41,7 @@ export const createAuthContainer = (deps: AuthContainerDeps): AuthContainer => {
       lockDurationMs: config.auth.lockDurationMs,
       refreshTtlSeconds: config.jwt.refreshTtlSeconds,
     },
+    presenceService,
   );
 
   const authController = new AuthController(authService, {

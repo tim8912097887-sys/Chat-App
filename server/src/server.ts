@@ -1,19 +1,20 @@
-import { Server } from "http";
-import { config } from "./config/env/index.js";
-import { logger } from "./config/logger/logger.js";
-import {
-  shutdown,
-  subscribeShutdown,
-} from "./infrastructure/lifecycle/shutdown.js";
-import { createApp } from "./app.js";
-import { dbConnection } from "./infrastructure/persistence/db.js";
-import { buildContainer } from "./container.js";
+import { createServer, type Server as HttpServer } from 'http';
+import type { Server as SocketServer } from 'socket.io';
+import { config } from './config/env/index.js';
+import { logger } from './config/logger/logger.js';
+import { shutdown, subscribeShutdown } from './infrastructure/lifecycle/shutdown.js';
+import { createApp } from './app.js';
+import { dbConnection } from './infrastructure/persistence/db.js';
+import { buildContainer } from './container.js';
+import { SocketIoRealtimeEventPublisher } from './realtime/socket-io-realtime-event-publisher.js';
+import { createSocketServer } from './realtime/socket-server.js';
 
 class AppServer {
   private static instance: AppServer;
-  private server?: Server;
+  private httpServer?: HttpServer;
   // Prevent multiple shutdown process
   private isShutdown = false;
+  private io?: SocketServer;
   private timeout = 10000;
   // Private constructor prevents direct "new AppServer()" calls
   private constructor() {
@@ -30,30 +31,41 @@ class AppServer {
   public async start(): Promise<void> {
     try {
       await dbConnection();
-      const container = buildContainer();
+      const realtimeEvents = new SocketIoRealtimeEventPublisher();
+      const container = buildContainer(realtimeEvents);
       const app = createApp(container);
-      this.server = app.listen(config.port, () => {
-        logger.info(
-          `Server initialization: Server start on port ${config.port}`,
-        );
+      this.httpServer = createServer(app);
+
+      this.io = createSocketServer({
+        httpServer: this.httpServer,
+        config,
+        tokenService: container.tokenService,
+        userRepository: container.user.userRepository,
+        presenceService: container.presenceService,
+      });
+
+      realtimeEvents.attach(this.io);
+      container.presenceService.attach(this.io);
+
+      await new Promise<void>((resolve, reject) => {
+        this.httpServer!.once('error', reject);
+
+        this.httpServer!.listen(config.port, () => {
+          this.httpServer!.off('error', reject);
+          logger.info(`Server listening on port ${config.port}`);
+          resolve();
+        });
       });
       subscribeShutdown(() => this.disConnectServer());
       logger.info(`Server initialization: Successfully register shutdown`);
     } catch (error: any) {
-      logger.error(
-        `Server Initialization: Server fail to start,Error: ${error}`,
-      );
+      logger.error(`Server Initialization: Server fail to start,Error: ${error}`);
       process.exit(1);
     }
   }
 
   private setupProcessHandlers(): void {
-    const exitSignals = [
-      "SIGINT",
-      "SIGTERM",
-      "uncaughtException",
-      "unhandledRejection",
-    ];
+    const exitSignals = ['SIGINT', 'SIGTERM', 'uncaughtException', 'unhandledRejection'];
     exitSignals.forEach((signal: string) => {
       process.on(signal, (reason) => this.gracefulShutdown(signal, reason));
     });
@@ -65,38 +77,51 @@ class AppServer {
 
     logger.info(`\n${signal} received. Starting graceful shutdown...`);
 
-    if (
-      reason &&
-      (signal === "uncaughtException" || signal === "unhandledRejection")
-    ) {
+    if (reason && (signal === 'uncaughtException' || signal === 'unhandledRejection')) {
       logger.error(`Reason: ${reason}`);
     }
     // Force exit after a timeout to prevent hanging
     const forceExit = setTimeout(() => {
-      logger.error("Shutdown timed out. Forcing exit.");
+      logger.error('Shutdown timed out. Forcing exit.');
       process.exit(1);
     }, this.timeout);
 
     try {
       await shutdown();
-      logger.info("Shutdown complete. Goodbye!");
+      logger.info('Shutdown complete. Goodbye!');
       clearTimeout(forceExit);
       process.exit(0);
     } catch (err) {
-      logger.error(err, "Error during shutdown:");
+      logger.error(err, 'Error during shutdown:');
       process.exit(1);
     }
   }
   private async disConnectServer() {
-    const serverInstance = this.server;
-    // Stop accepting new requests
-    if (serverInstance) {
-      logger.info("Closing HTTP server...");
-      await new Promise((resolve, reject) => {
-        serverInstance.close((err) => (err ? reject(err) : resolve("Success")));
+    // Socket.IO close also closes its attached HTTP server.
+    if (this.io) {
+      await this.io.close((error?: Error) => {
+        if (error) {
+          logger.error({ error }, 'Websocket closed fail');
+        }
       });
-      logger.info("HTTP server closed.");
+
+      this.io = undefined;
+      this.httpServer = undefined;
+      return;
     }
+
+    if (this.httpServer?.listening) {
+      await new Promise<void>((resolve, reject) => {
+        this.httpServer?.close((error) => {
+          if (error) {
+            logger.error({ error }, 'server close error');
+            reject(error);
+          } else resolve();
+        });
+      });
+    }
+
+    this.httpServer = undefined;
   }
 }
 

@@ -8,11 +8,13 @@ import {
   expectSuccessMessageResponse,
   expectValidationError,
 } from '../../utils/common/assertion.js';
-import { api } from '../../utils/common/app.js';
+import { api, mockedRealtimePublisher } from '../../utils/common/app.js';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
 import { rejectRelationship, createPendingRequest } from '../../utils/relationship/query.js';
 import { rejectRelationshipUrl } from '../../utils/relationship/constants.js';
 import { signupAndLogin } from '../../utils/user/query.js';
+import { realtimeEventAssertion } from '../../utils/common/realtime.js';
+import { FRIEND_REQUEST_REJECTED_EVENT } from '../../../realtime/realtime.constants.js';
 
 describe('reject relationship', () => {
   beforeEach(async () => {
@@ -21,17 +23,31 @@ describe('reject relationship', () => {
 
   describe('success', () => {
     it('when the recipient rejects a pending request should return 200 and mark it rejected', async () => {
-      const { recipientAccessToken, requestId } = await createPendingRequest();
+      const { recipientAccessToken, requester, recipient, requestId } =
+        await createPendingRequest();
 
       const response = await rejectRelationship(recipientAccessToken, requestId);
       const relationship = await friendshipModel.findById(requestId);
 
       expectSuccessMessageResponse(response, 200, 'Friend request rejected');
       expect(relationship?.status).toBe('REJECTED');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(2);
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledWith(
+        requester._id.toString(),
+        realtimeEventAssertion(FRIEND_REQUEST_REJECTED_EVENT, {
+          requestId,
+          actor: {
+            id: recipient._id.toString(),
+            name: recipient.name,
+            imageUrl: recipient.imageUrl ?? null,
+          },
+        }),
+      );
     });
 
     it('when the recipient concurrently rejects a request twice should reject it once', async () => {
-      const { recipientAccessToken, requestId } = await createPendingRequest();
+      const { recipientAccessToken, requester, recipient, requestId } =
+        await createPendingRequest();
 
       const responses = await Promise.all([
         rejectRelationship(recipientAccessToken, requestId),
@@ -43,6 +59,18 @@ describe('reject relationship', () => {
         'ServerConflictError',
       );
       expect((await friendshipModel.findById(requestId))?.status).toBe('REJECTED');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(2);
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledWith(
+        requester._id.toString(),
+        realtimeEventAssertion(FRIEND_REQUEST_REJECTED_EVENT, {
+          requestId,
+          actor: {
+            id: recipient._id.toString(),
+            name: recipient.name,
+            imageUrl: recipient.imageUrl ?? null,
+          },
+        }),
+      );
     });
   });
 
@@ -138,6 +166,7 @@ describe('reject relationship', () => {
 
       expectServerConflictError(response, 'Friend request is not available to this user');
       expect(status ? (await friendshipModel.findById(requestId))?.status : null).toBe(status);
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
 
     it('when a user outside the relationship tries to reject should return 409', async () => {
@@ -152,6 +181,7 @@ describe('reject relationship', () => {
       expect((await friendshipModel.findById(requestId))?.userIds).toContain(
         recipient._id.toString(),
       );
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
 
     it('when the requester tries to reject should return 409 without changing status', async () => {
@@ -161,6 +191,7 @@ describe('reject relationship', () => {
 
       expectServerConflictError(response, 'Friend request is not available to this user');
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
 
     it('when the pending status update loses a race should return 409 and keep the status unchanged', async () => {
@@ -174,6 +205,7 @@ describe('reject relationship', () => {
 
       expectServerConflictError(response, 'Friend request is no longer pending');
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -189,6 +221,7 @@ describe('reject relationship', () => {
       expectServerError(response);
       expect(updatePendingRequestStatus).toHaveBeenCalledOnce();
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
   });
 });

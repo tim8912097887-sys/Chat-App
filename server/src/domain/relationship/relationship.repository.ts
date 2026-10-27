@@ -16,7 +16,7 @@ export interface RelationshipRepository {
     recipientId: string,
     pairKey: string,
   ): Promise<FriendshipDocument>;
-  reopenRejectedRequest(requestId: string, requesterId: string): Promise<boolean>;
+  reopenRejectedRequest(requestId: string, requesterId: string): Promise<FriendshipDocument | null>;
   updatePendingRequestStatus(requestId: string, status: 'ACCEPTED' | 'REJECTED'): Promise<boolean>;
 }
 
@@ -78,14 +78,18 @@ export class MongoRelationshipRepository implements RelationshipRepository {
     }
   }
 
-  async reopenRejectedRequest(requestId: string, requesterId: string): Promise<boolean> {
+  async reopenRejectedRequest(
+    requestId: string,
+    requesterId: string,
+  ): Promise<FriendshipDocument | null> {
     const result = await this.friendshipModel
-      .updateOne(
+      .findOneAndUpdate(
         { _id: requestId, status: 'REJECTED' },
         { $set: { requestedBy: requesterId, status: 'PENDING' } },
+        { new: true }, // Returns the updated document
       )
       .exec();
-    return result.modifiedCount > 0;
+    return result;
   }
 
   async updatePendingRequestStatus(

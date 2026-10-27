@@ -24,6 +24,12 @@ export const refreshTokenSchema = new Schema(
       index: true,
     },
 
+    userId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+
     parentId: {
       type: String,
       default: null,
