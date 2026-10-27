@@ -16,7 +16,7 @@ export interface CreateFriendRequestInput {
 }
 
 export interface FriendRequestListItem {
-  id: string;
+  requestId: string;
   name: string;
   imageUrl: string | null;
 }

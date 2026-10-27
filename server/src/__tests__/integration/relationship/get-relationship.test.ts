@@ -35,7 +35,7 @@ describe('get relationship requests', () => {
 
         expectSuccessDataResponse(response, 200, [
           {
-            id: requestId,
+            requestId: requestId,
             name: otherUser.name,
             imageUrl: null,
           },
@@ -72,7 +72,7 @@ describe('get relationship requests', () => {
 
       expectSuccessDataResponse(incomingResponse, 200, [
         {
-          id: expect.any(String),
+          requestId: expect.any(String),
           name: requester.name,
           imageUrl: null,
         },
@@ -118,8 +118,12 @@ describe('get relationship requests', () => {
       expect(secondPage.status).toBe(200);
       expect(firstPage.body.data).toHaveLength(2);
       expect(secondPage.body.data).toHaveLength(1);
-      const firstPageIds = firstPage.body.data.map((request: { id: string }) => request.id);
-      const secondPageIds = secondPage.body.data.map((request: { id: string }) => request.id);
+      const firstPageIds = firstPage.body.data.map(
+        (request: { requestId: string }) => request.requestId,
+      );
+      const secondPageIds = secondPage.body.data.map(
+        (request: { requestId: string }) => request.requestId,
+      );
 
       expect(new Set([...firstPageIds, ...secondPageIds])).toEqual(new Set(requestIds));
       expect(firstPageIds.some((id: string) => secondPageIds.includes(id))).toBe(false);
@@ -135,7 +139,7 @@ describe('get relationship requests', () => {
 
       expectSuccessDataResponse(response, 200, [
         {
-          id: requestId,
+          requestId: requestId,
           name: requester.name,
           imageUrl: null,
         },

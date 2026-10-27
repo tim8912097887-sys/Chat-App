@@ -7,6 +7,7 @@ import { RelationshipController } from './relationship.controller.js';
 import { MongoRelationshipRepository } from './relationship.repository.js';
 import type { RelationshipRepository } from './relationship.repository.js';
 import { RelationshipService } from './relationship.service.js';
+import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
 
 export interface RelationshipContainer {
   relationshipRepository: RelationshipRepository;
@@ -18,15 +19,25 @@ export interface RelationshipContainer {
 export interface RelationshipContainerDeps {
   userRepository: UserRepository;
   tokenService: TokenService;
+  realtimeEvents: RealtimeEventPublisher;
 }
 
 export const createRelationshipContainer = (
   deps: RelationshipContainerDeps,
 ): RelationshipContainer => {
   const relationshipRepository = new MongoRelationshipRepository(registerFriendshipsModel());
-  const relationshipService = new RelationshipService(relationshipRepository, deps.userRepository);
+
+  const relationshipService = new RelationshipService(
+    relationshipRepository,
+    deps.userRepository,
+    deps.realtimeEvents,
+  );
+
   const relationshipController = new RelationshipController(relationshipService);
-  const accessTokenMiddleware = createAccessTokenMiddleware({ tokenService: deps.tokenService });
+
+  const accessTokenMiddleware = createAccessTokenMiddleware({
+    tokenService: deps.tokenService,
+  });
 
   return {
     relationshipRepository,

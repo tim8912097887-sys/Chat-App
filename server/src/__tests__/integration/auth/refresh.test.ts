@@ -31,6 +31,8 @@ describe('refresh', () => {
       expect(userRecord[0]?.tokenVersion).toBe(0);
       expect(newRefreshToken?.revokedAt).toBeNull();
       expect(invalidateRefreshToken?.revokedAt).not.toBeNull();
+      expect(newRefreshToken?.userId).toBe(userRecord[0]?._id.toString());
+      expect(invalidateRefreshToken?.userId).toBe(userRecord[0]?._id.toString());
     });
   });
 

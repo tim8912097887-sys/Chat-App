@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MongoRelationshipRepository } from '../../../domain/relationship/relationship.repository.js';
 import { signupAndLogin } from '../../utils/user/query.js';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
-import { api } from '../../utils/common/app.js';
+import { api, mockedRealtimePublisher } from '../../utils/common/app.js';
 import { LOGOUT_ALL_URL } from '../../utils/auth/constants.js';
 import {
   acceptRelationship,
@@ -17,6 +17,8 @@ import {
   expectValidationError,
 } from '../../utils/common/assertion.js';
 import { RELATIONSHIP_INVITE_URL } from '../../utils/relationship/constants.js';
+import { realtimeEventAssertion } from '../../utils/common/realtime.js';
+import { FRIEND_REQUEST_CREATED_EVENT } from '../../../realtime/realtime.constants.js';
 
 describe('invite friend', () => {
   beforeEach(async () => {
@@ -41,13 +43,27 @@ describe('invite friend', () => {
         requestedBy: requester!._id.toString(),
         status: 'PENDING',
       });
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledOnce();
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledWith(
+        recipient!._id.toString(),
+        realtimeEventAssertion(FRIEND_REQUEST_CREATED_EVENT, {
+          requestId: friendship?._id.toString(),
+          requester: {
+            id: requester!._id.toString(),
+            name: requester!.name,
+            imageUrl: requester!.imageUrl ?? null,
+          },
+        }),
+      );
     });
 
     it('when invite friend that already been rejected should return 200 with message', async () => {
       const { accessToken: firstAccessToken } = await signupAndLogin();
       const firstUser = await userModel.findOne({});
       expect(firstUser?.tokenVersion).not.toBeNull();
-      const { accessToken: secondAccessToken } = await signupAndLogin();
+      const { accessToken: secondAccessToken, email: secondEmail } = await signupAndLogin();
+      const secondUser = await userModel.findOne({ email: secondEmail });
+      expect(secondUser).not.toBeNull();
       await inviteFriend(secondAccessToken, firstUser?._id.toString() as string);
       const invite = await friendshipModel.findOne({});
       expect(invite?.status).toBe('PENDING');
@@ -58,6 +74,18 @@ describe('invite friend', () => {
 
       expectSuccessMessageResponse(response, 201, 'Friend request sent');
       expect(updatedInvite?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(3);
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledWith(
+        firstUser!._id.toString(),
+        realtimeEventAssertion(FRIEND_REQUEST_CREATED_EVENT, {
+          requestId: updatedInvite?._id.toString(),
+          requester: {
+            id: secondUser!._id.toString(),
+            name: secondUser!.name,
+            imageUrl: secondUser!.imageUrl ?? null,
+          },
+        }),
+      );
     });
 
     it('when both users concurrently invite each other should create only one pending request', async () => {
@@ -79,6 +107,7 @@ describe('invite friend', () => {
       );
       expect(await friendshipModel.countDocuments()).toBe(1);
       expect((await friendshipModel.findOne({}))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledOnce();
     });
 
     it('when both users concurrently reopen a rejected request should reopen it only once', async () => {
@@ -106,6 +135,7 @@ describe('invite friend', () => {
       );
       expect(await friendshipModel.countDocuments()).toBe(1);
       expect((await friendshipModel.findById(initialRequest!._id))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -215,6 +245,7 @@ describe('invite friend', () => {
 
         expectServerConflictError(response, 'A friend request or friendship already exists');
         expect(await friendshipModel.countDocuments()).toBe(1);
+        expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledOnce();
       },
     );
 
@@ -227,6 +258,7 @@ describe('invite friend', () => {
 
       expectServerConflictError(response, 'A user cannot send a friend request to themselves');
       expect(await friendshipModel.countDocuments()).toBe(0);
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
 
     it('when invite friend that already been accepted should return 409 with message', async () => {
@@ -242,6 +274,7 @@ describe('invite friend', () => {
       const response = await inviteFriend(secondAccessToken, firstUser?._id.toString() as string);
 
       expectServerConflictError(response, 'A friend request or friendship already exists');
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -262,6 +295,7 @@ describe('invite friend', () => {
       expectServerError(response);
       expect(createFriendRequestSpy).toHaveBeenCalledOnce();
       expect(await friendshipModel.countDocuments()).toBe(0);
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../utils/common/app.js';
 import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
-import { truncateAll, userModel } from '../../utils/common/query.js';
+import { authModel, truncateAll, userModel } from '../../utils/common/query.js';
 import { LOGOUT_ALL_URL, REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
 import {
   expectAuthError,
@@ -21,9 +21,11 @@ describe('logout-all', () => {
 
       const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
       const record = await userModel.find({});
+      const refreshTokens = await authModel.find({});
 
       expectSuccessMessageResponse(res, 200, 'Logged out all sessions');
       expect(record[0]?.tokenVersion).toBe(1);
+      expect(refreshTokens.every((refreshToken) => refreshToken.revokedAt !== null)).toBe(true);
     });
   });
 
