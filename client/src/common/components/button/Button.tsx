@@ -4,12 +4,21 @@ type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonVariant = "primary" | "secondary" | "success" | "danger" | "outline";
 
+type ButtonShape = "rounded" | "pill";
+
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   variant?: ButtonVariant;
+  shape?: ButtonShape;
   fullWidth?: boolean;
   loading?: boolean;
+  unstyled?: boolean;
 }
+
+const shapeClasses: Record<ButtonShape, string> = {
+  rounded: "rounded-lg",
+  pill: "rounded-full",
+};
 
 const sizeClasses: Record<ButtonSize, string> = {
   sm: "min-h-9 px-3 text-sm",
@@ -34,7 +43,9 @@ export function Button({
   variant = "primary",
   fullWidth = false,
   loading = false,
+  unstyled = false,
   disabled,
+  shape = "rounded",
   className = "",
   type = "button",
   children,
@@ -48,23 +59,28 @@ export function Button({
       disabled={isDisabled}
       aria-busy={loading || undefined}
       className={[
-        "inline-flex items-center justify-center gap-2",
-        "rounded-lg font-semibold",
-        "transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-2",
-        "focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+        "relative inline-flex items-center justify-center gap-2",
         "disabled:cursor-not-allowed disabled:opacity-50",
         "motion-reduce:transition-none",
-        sizeClasses[size],
-        variantClasses[variant],
-        fullWidth ? "w-full" : "",
+        unstyled
+          ? ""
+          : [
+              "font-semibold",
+              "transition-colors duration-150",
+              "focus-visible:outline-none focus-visible:ring-2",
+              "focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+              sizeClasses[size],
+              variantClasses[variant],
+              shapeClasses[shape],
+              fullWidth ? "w-full" : "",
+            ].join(" "),
         className,
       ].join(" ")}
       {...props}
     >
-      {loading && (
+      {isDisabled && (
         <svg
-          className="size-4 animate-spin motion-reduce:animate-none"
+          className="absolute size-4 animate-spin motion-reduce:animate-none"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden="true"
@@ -86,7 +102,7 @@ export function Button({
         </svg>
       )}
 
-      {!isDisabled && children}
+      {children}
     </button>
   );
 }

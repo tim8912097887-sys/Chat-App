@@ -9,7 +9,7 @@ import { InvalidCredentialError } from './error/invalid-credential.js';
 import { InvalidTokenError } from './error/invalid-token.js';
 import { LoginLockedError } from './error/login-locked.js';
 import { RefreshTokenInput, TokenPayload, TokenService } from './util/token-validator.js';
-import { AuthTokens } from './dto/token.js';
+import { AuthDto, AuthTokens } from './dto/token.js';
 import { CloudinaryImageStorage, StoredImage } from './image.service.js';
 import { logger } from '../../config/logger/logger.js';
 import { PresenceService } from '../../realtime/presence.service.js';
@@ -73,7 +73,7 @@ export class AuthService {
     }
   }
 
-  async login(input: LoginInput): Promise<AuthTokens> {
+  async login(input: LoginInput): Promise<AuthDto> {
     const user = await this.userService.findByEmail(input.email);
 
     if (!user || user.status !== 'ACTIVE') {
@@ -107,10 +107,17 @@ export class AuthService {
     const tokens = await this.issueTokens(user);
     await this.createRefreshTokenRecord(tokens.refreshToken, randomUUID(), user.id);
 
-    return tokens;
+    return {
+      tokens,
+      user: {
+        id: user.id,
+        name: user.name,
+        imageUrl: user.imageUrl,
+      },
+    };
   }
 
-  async refresh(token: RefreshTokenInput): Promise<AuthTokens> {
+  async refresh(token: RefreshTokenInput): Promise<AuthDto> {
     const user = await this.requireValidSession({
       userId: token.userId,
       tokenVersion: token.tokenVersion,
@@ -145,7 +152,14 @@ export class AuthService {
       expiredAt: new Date(Date.now() + this.options.refreshTtlSeconds * 1000),
     });
 
-    return tokens;
+    return {
+      tokens,
+      user: {
+        id: user.id,
+        name: user.name,
+        imageUrl: user.imageUrl,
+      },
+    };
   }
 
   async logout(token: RefreshTokenInput): Promise<void> {
