@@ -7,6 +7,7 @@ const prefix = import.meta.env.VITE_API_BASE_URL
 export const authClient = axios.create({
   baseURL: prefix,
   timeout: 10_000,
+  withCredentials: true,
 });
 
 // Interceptors for error handling

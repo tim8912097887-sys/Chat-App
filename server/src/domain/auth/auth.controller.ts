@@ -4,7 +4,7 @@ import { SignupInput } from './dto/signup.js';
 import { LoginInput } from './dto/login.js';
 import { successResponse } from '../../shared/http/success.js';
 import { InvalidTokenError } from './error/invalid-token.js';
-import { AuthTokens } from './dto/token.js';
+import { AuthDto, AuthTokens } from './dto/token.js';
 import { RefreshCookieOptions } from './auth.types.js';
 
 export class AuthController {
@@ -28,13 +28,13 @@ export class AuthController {
   };
 
   login: RequestHandler = async (req, res) => {
-    const tokens = await this.authService.login(req.body as LoginInput);
-    this.sendTokens(res, tokens);
+    const authDto = await this.authService.login(req.body as LoginInput);
+    this.sendTokens(res, authDto);
   };
 
   refresh: RequestHandler = async (req, res) => {
-    const tokens = await this.authService.refresh(this.requireRefreshToken(req));
-    this.sendTokens(res, tokens);
+    const authDto = await this.authService.refresh(this.requireRefreshToken(req));
+    this.sendTokens(res, authDto);
   };
 
   logout: RequestHandler = async (req, res) => {
@@ -59,12 +59,12 @@ export class AuthController {
     return req.refreshToken;
   }
 
-  private sendTokens(res: Response, tokens: AuthTokens): void {
-    res.cookie(this.cookie.name, tokens.refreshToken, {
+  private sendTokens(res: Response, authDto: AuthDto): void {
+    res.cookie(this.cookie.name, authDto.tokens.refreshToken, {
       ...this.baseCookieOptions(),
       maxAge: this.cookie.maxAgeMs,
     });
-    this.sendResponse(res, 200, { accessToken: tokens.accessToken });
+    this.sendResponse(res, 200, { accessToken: authDto.tokens.accessToken, user: authDto.user });
   }
 
   private sendResponse<T>(res: Response, status: number, data: T): void {
