@@ -10,8 +10,12 @@ import { authQuery } from "../api/query/query";
 import { ApiError } from "../../../common/error/api-error";
 import SubmitError from "../components/SubmitError";
 import { toast } from "react-toastify";
+import { useAuthStore } from "../store/store";
+import { useNavigate } from "react-router";
 
 export default function LoginPage() {
+  const navigation = useNavigate();
+  const setAuthSession = useAuthStore((s) => s.setSession);
   const { register, handleSubmit, formState, clearErrors, setError } =
     useForm<LoginInput>({
       resolver: zodResolver(loginSchema),
@@ -21,8 +25,13 @@ export default function LoginPage() {
   async function onSubmit(input: LoginInput) {
     clearErrors();
     try {
-      await authQuery.login(input);
+      const loginResponse = await authQuery.login(input);
+      setAuthSession({
+        accessToken: loginResponse.accessToken,
+        user: loginResponse.user,
+      });
       toast.success("Logged in successfully.");
+      navigation("/");
     } catch (error) {
       let message = "Unable to log in. Please try again.";
       if (error instanceof ApiError) {
