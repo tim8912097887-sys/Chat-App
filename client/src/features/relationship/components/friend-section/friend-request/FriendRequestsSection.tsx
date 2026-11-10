@@ -5,6 +5,8 @@ import useGetFriendRequest from "../../../hooks/useGetFriendRequest";
 import FriendRequestsSkeleton from "./FriendRequestsSkeleton";
 import RetrySection from "../../../../../common/components/retry/RetrySection";
 import FriendRequestsEmptySection from "./FriendRequestsEmptySection";
+import useAcceptFriend from "../../../hooks/useAcceptFriend";
+import useRejectFriend from "../../../hooks/useRejectFriend";
 
 const FriendRequestsSection = () => {
   const [activeTab, setActiveTab] = useState<"received" | "sent">("received");
@@ -23,6 +25,9 @@ const FriendRequestsSection = () => {
     retry: outgoingRequestRetry,
   } = useGetFriendRequest({ direction: "outgoing" });
 
+  const { loading: acceptFriendLoading, acceptFriend } = useAcceptFriend();
+  const { loading: rejectFriendLoading, rejectFriend } = useRejectFriend();
+
   // Select active tab state
   const isSent = activeTab === "sent";
   const displayRequests = isSent ? outgoingRequests : incomingRequests;
@@ -40,6 +45,13 @@ const FriendRequestsSection = () => {
     !hasError &&
     displayRequests !== null &&
     displayRequests.length === 0;
+  // Function abstraction for button
+  const handleAcceptFriend = async (requestId: string) => {
+    await acceptFriend(requestId);
+  };
+  const handleRejectFriend = async (requestId: string) => {
+    await rejectFriend(requestId);
+  };
 
   return (
     <div className="space-y-4 pt-4 border-t border-slate-100">
@@ -159,6 +171,9 @@ const FriendRequestsSection = () => {
                         shape="pill"
                         size="sm"
                         variant="primary"
+                        disabled={acceptFriendLoading || rejectFriendLoading}
+                        loading={acceptFriendLoading}
+                        onClick={() => handleAcceptFriend(req.requestId)}
                       >
                         Accept
                       </Button>
@@ -168,6 +183,9 @@ const FriendRequestsSection = () => {
                         shape="pill"
                         size="sm"
                         variant="secondary"
+                        disabled={acceptFriendLoading || rejectFriendLoading}
+                        loading={rejectFriendLoading}
+                        onClick={() => handleRejectFriend(req.requestId)}
                       >
                         Reject
                       </Button>

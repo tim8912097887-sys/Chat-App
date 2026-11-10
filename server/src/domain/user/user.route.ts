@@ -10,7 +10,12 @@ export const createUserRouter = (deps: {
   const { controller, accessTokenMiddleware } = deps;
   const router = Router();
 
-  router.get('/search', validateQueryParams(searchCodeQuerySchema), controller.search);
+  router.get(
+    '/search',
+    accessTokenMiddleware,
+    validateQueryParams(searchCodeQuerySchema),
+    controller.search,
+  );
   router.get(
     '/friend/search',
     accessTokenMiddleware,

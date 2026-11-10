@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../../../auth/store/store";
 import Avatar from "../../../../common/components/avatar/Avatar";
+import useLogout from "../../../auth/hooks/useLogout";
+import useLogoutAll from "../../../auth/hooks/useLogoutAll";
+import { Button } from "../../../../common/components/button";
 
 const AccountDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((s) => s.user);
+  const { loading: logoutLoading, logoutUser } = useLogout();
+  const { loading: logoutAllLoading, logoutAllUser } = useLogoutAll();
 
   // Close dropdown on outside click or Esc key
   useEffect(() => {
@@ -27,14 +32,14 @@ const AccountDropdown = () => {
     };
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutUser();
     setIsOpen(false);
-    console.log("Logged out");
   };
 
-  const handleLogoutAll = () => {
+  const handleLogoutAll = async () => {
+    await logoutAllUser();
     setIsOpen(false);
-    console.log("Logged out of all sessions");
   };
 
   return (
@@ -91,8 +96,11 @@ const AccountDropdown = () => {
             <p className="text-xs text-slate-500 truncate">user@example.com</p>
           </div>
 
-          <button
+          <Button
             role="menuitem"
+            unstyled={true}
+            disabled={logoutLoading || logoutAllLoading}
+            loading={logoutLoading}
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition text-left"
           >
@@ -110,11 +118,14 @@ const AccountDropdown = () => {
               />
             </svg>
             Log out
-          </button>
+          </Button>
 
-          <button
+          <Button
             role="menuitem"
+            unstyled={true}
             onClick={handleLogoutAll}
+            disabled={logoutLoading || logoutAllLoading}
+            loading={logoutAllLoading}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-xl transition text-left"
           >
             <svg
@@ -131,7 +142,7 @@ const AccountDropdown = () => {
               />
             </svg>
             Log out all devices
-          </button>
+          </Button>
         </div>
       )}
     </div>
