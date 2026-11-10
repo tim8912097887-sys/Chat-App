@@ -1,10 +1,9 @@
-import { ApiError } from "../../../../common/error/api-error";
 import type { ApiSuccessResponse } from "../../../../common/types/response/response";
 import {
   LOGIN_URL,
   LOGOUT_ALL_URL,
   LOGOUT_URL,
-  // REFRESH_URL,
+  REFRESH_URL,
   SIGNUP_URL,
 } from "../../constants/constants";
 import type { LoginInput } from "../../input/login";
@@ -57,24 +56,9 @@ const logoutAll = async (): Promise<LogoutResponse> => {
 };
 
 const refresh = async (): Promise<RefreshResponse> => {
-  // const res =
-  //   await authClient.post<ApiSuccessResponse<RefreshResponse>>(REFRESH_URL);
-  // return res.data.data;
-  await new Promise((resolve) => setTimeout(() => resolve(""), 3000));
-  if (Math.random() > 0.6) {
-    return {
-      accessToken: "osdfjosdf",
-      user: {
-        id: "1",
-        name: "john",
-        imageUrl: null,
-      },
-    };
-  } else {
-    throw new ApiError("Network Error", {
-      status: 500,
-    });
-  }
+  const res =
+    await authClient.post<ApiSuccessResponse<RefreshResponse>>(REFRESH_URL);
+  return res.data.data;
 };
 
 export const authQuery = { signup, login, logout, logoutAll, refresh };

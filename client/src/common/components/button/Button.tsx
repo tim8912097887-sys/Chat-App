@@ -78,7 +78,7 @@ export function Button({
       ].join(" ")}
       {...props}
     >
-      {isDisabled && (
+      {loading && (
         <svg
           className="absolute size-4 animate-spin motion-reduce:animate-none"
           viewBox="0 0 24 24"

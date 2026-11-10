@@ -4,7 +4,7 @@ import { SignupInput } from './dto/signup.js';
 import { LoginInput } from './dto/login.js';
 import { successResponse } from '../../shared/http/success.js';
 import { InvalidTokenError } from './error/invalid-token.js';
-import { AuthDto, AuthTokens } from './dto/token.js';
+import { AuthDto } from './dto/token.js';
 import { RefreshCookieOptions } from './auth.types.js';
 
 export class AuthController {
