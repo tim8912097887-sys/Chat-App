@@ -1,4 +1,3 @@
-import { ApiError } from "../../../../common/error/api-error";
 import type { ApiSuccessResponse } from "../../../../common/types/response/response";
 import {
   ACCEPT_FRIEND_REQUEST_URL,
@@ -28,32 +27,10 @@ const getFriendRequests = async (
     limit?: number;
   },
 ): Promise<FriendRequestItem[]> => {
-  // const res = await relationshipClient.get<ApiSuccessResponse<FriendRequestItem[]>>(
-  //   FRIEND_REQUESTS_URL,
-  //   { ...authConfig(accessToken), params: query },
-  // );
-  // return res.data.data;
-
-  console.log(accessToken, query);
-  await new Promise((resolve) => setTimeout(() => resolve(""), 2000));
-  if (Math.random() > 0.6) {
-    throw new ApiError("Something", {
-      status: 404,
-    });
-  } else {
-    return [
-      {
-        requestId: "1",
-        name: "Jimmy",
-        imageUrl: null,
-      },
-      {
-        requestId: "2",
-        name: "Jason",
-        imageUrl: null,
-      },
-    ];
-  }
+  const res = await relationshipClient.get<
+    ApiSuccessResponse<FriendRequestItem[]>
+  >(FRIEND_REQUESTS_URL, { ...authConfig(accessToken), params: query });
+  return res.data.data;
 };
 
 const createFriendRequest = async (

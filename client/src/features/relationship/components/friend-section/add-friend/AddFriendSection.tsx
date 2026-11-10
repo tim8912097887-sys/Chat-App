@@ -4,14 +4,26 @@ import useSearchUser from "../../../../user/hooks/useSearchUser";
 import RetrySection from "../../../../../common/components/retry/RetrySection";
 import { Button } from "../../../../../common/components/button";
 import UserNotFoundSection from "./UserNotFoundSection";
+import useAddFriend from "../../../hooks/useAddFriend";
 
 const AddFriendSection = () => {
   const [code, setCode] = useState("");
-  const { searchUser, data, error, loading, hasSearch } = useSearchUser();
+  const {
+    searchUser,
+    data,
+    error: searchError,
+    loading: searchLoading,
+    hasSearch,
+  } = useSearchUser();
+  const { loading: addLoading, addFriend } = useAddFriend();
 
   const handleSearch = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     await searchUser(code);
+  };
+
+  const handleAddFriend = async (targetUserId: string) => {
+    await addFriend(targetUserId);
   };
 
   return (
@@ -53,20 +65,20 @@ const AddFriendSection = () => {
           className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200/80 rounded-2xl uppercase tracking-wider font-mono placeholder:font-sans placeholder:normal-case placeholder:tracking-normal focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
         />
 
-        <Button type="submit" loading={loading} fullWidth={true}>
+        <Button type="submit" loading={searchLoading} fullWidth={true}>
           Find user
         </Button>
       </form>
 
-      {error && (
+      {searchError && (
         <RetrySection
-          retrying={loading}
+          retrying={searchLoading}
           onRetry={() => searchUser(code)}
-          message={error}
+          message={searchError}
         />
       )}
-      {hasSearch && !error && data === null && <UserNotFoundSection />}
-      {!error && data && (
+      {hasSearch && !searchError && data === null && <UserNotFoundSection />}
+      {!searchError && data && (
         <div className="mt-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 flex items-center justify-between gap-3 animate-in fade-in duration-200">
           <div className="flex items-center gap-3 min-w-0">
             <Avatar
@@ -81,7 +93,12 @@ const AddFriendSection = () => {
               </p>
             </div>
           </div>
-          <Button type="button" size="sm">
+          <Button
+            type="button"
+            loading={addLoading}
+            size="sm"
+            onClick={() => handleAddFriend(data.id)}
+          >
             Send Request
           </Button>
         </div>
