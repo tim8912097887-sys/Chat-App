@@ -6,6 +6,7 @@ import NotFoundPage from "../common/components/pages/NotFoundPage";
 import RelationshipHomePage from "../features/relationship/pages/RelationshipHomePage";
 import AuthGuard from "./components/AuthGuard";
 import GuestGuard from "./components/GuestGuard";
+import AuthenticatedLayout from "../features/relationship/layouts/AuthenticatedLayout";
 
 const router = createBrowserRouter([
   {
@@ -16,8 +17,13 @@ const router = createBrowserRouter([
         element: <AuthGuard />,
         children: [
           {
-            index: true,
-            element: <RelationshipHomePage />,
+            element: <AuthenticatedLayout />,
+            children: [
+              {
+                index: true,
+                element: <RelationshipHomePage />,
+              },
+            ],
           },
         ],
       },
