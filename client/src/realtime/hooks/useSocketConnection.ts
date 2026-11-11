@@ -4,20 +4,28 @@ import { socket } from "../socket";
 
 const useSocketConnection = () => {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const status = useAuthStore((s) => s.status);
 
   useEffect(() => {
-    if (!accessToken) {
-      socket.disconnect();
+    if (status !== "authenticated" || !accessToken) {
+      if (socket.connected) {
+        socket.disconnect();
+      }
       return;
     }
+
     socket.auth = { accessToken };
-    socket.connect();
+    if (!socket.connected) {
+      socket.connect();
+    } else {
+      // If already connected with an old token, force reconnect
+      socket.disconnect().connect();
+    }
 
     return () => {
       socket.disconnect();
     };
-  }, [accessToken]);
-  return;
+  }, [accessToken, status]);
 };
 
 export default useSocketConnection;

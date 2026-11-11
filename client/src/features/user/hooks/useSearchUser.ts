@@ -1,63 +1,42 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
-import type { SearchUserResponse } from "../types";
 import { userQuery } from "../api/query/query";
-import { ApiError } from "../../../common/error/api-error";
 
 const useSearchUser = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [data, setData] = useState<SearchUserResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [hasSearch, setHasSearch] = useState(false);
-  const latestRequestIdRef = useRef(0);
+  const mutation = useMutation({
+    mutationFn: (searchResult: string) => {
+      if (!accessToken) {
+        throw new Error("Authentication required");
+      }
+
+      return userQuery.searchByCode(accessToken, searchResult);
+    },
+  });
 
   const searchUser = async (searchResult: string) => {
-    if (typeof searchResult !== "string" || searchResult === "") {
+    if (
+      typeof searchResult !== "string" ||
+      searchResult === "" ||
+      !accessToken
+    ) {
       return;
     }
-    const currentRequestId = ++latestRequestIdRef.current;
 
-    setLoading(true);
-
-    try {
-      const user = await userQuery.searchByCode(
-        accessToken as string,
-        searchResult,
-      );
-
-      // Only update state if this is still the latest request
-      if (currentRequestId === latestRequestIdRef.current) {
-        setError(null);
-        setData(user);
-      }
-    } catch (requestError: unknown) {
-      // Only update error if this is still the latest request
-      if (currentRequestId === latestRequestIdRef.current) {
-        let errorMessage;
-        if (requestError instanceof ApiError || requestError instanceof Error) {
-          errorMessage = requestError.message;
-        } else {
-          errorMessage = "Unknown error";
-        }
-
-        setData(null);
-        setError(errorMessage);
-      }
-    } finally {
-      // Ensure loading state only turns off if no newer request has started
-      if (currentRequestId === latestRequestIdRef.current) {
-        if (!hasSearch) {
-          setHasSearch(true);
-        }
-        setLoading(false);
-      }
-    }
+    await mutation.mutateAsync(searchResult).catch(() => undefined);
+    setHasSearch(true);
   };
+
   return {
-    data,
-    error,
-    loading,
+    data: mutation.data ?? null,
+    error: mutation.error
+      ? mutation.error instanceof Error
+        ? mutation.error.message
+        : "Unknown error"
+      : null,
+    loading: mutation.isPending,
     hasSearch,
     searchUser,
   };

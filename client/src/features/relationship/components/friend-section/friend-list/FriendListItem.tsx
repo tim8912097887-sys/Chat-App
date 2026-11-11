@@ -1,4 +1,5 @@
 import Avatar from "../../../../../common/components/avatar/Avatar";
+import { usePresenceStore } from "../../../stores/store";
 import type { FriendPhoto } from "../../../types";
 
 type FriendListItemProps = {
@@ -6,6 +7,10 @@ type FriendListItemProps = {
 };
 
 const FriendListItem = ({ friend }: FriendListItemProps) => {
+  const isOnline = usePresenceStore(
+    (state) => state.onlineUsers[friend.id] ?? friend.isOnline,
+  );
+
   return (
     <li>
       <button
@@ -27,11 +32,11 @@ const FriendListItem = ({ friend }: FriendListItemProps) => {
             </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span
-                className={`w-2 h-2 rounded-full shrink-0 ${friend.isOnline ? "bg-emerald-500" : "bg-slate-300"}`}
+                className={`w-2 h-2 rounded-full shrink-0 ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`}
                 aria-hidden="true"
               />
               <span className="text-xs text-slate-400 capitalize">
-                {friend.isOnline ? "Online" : "Offline"}
+                {isOnline ? "Online" : "Offline"}
               </span>
             </div>
           </div>

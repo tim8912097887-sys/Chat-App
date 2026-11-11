@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { ApiError } from "../../../common/error/api-error";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
 import { FRIEND_REQUESTS_LIMIT } from "../constants/constants";
 import { relationshipQuery } from "../api/query/query";
-import type { FriendRequestDirection, FriendRequestItem } from "../types";
+import type { FriendRequestDirection } from "../types";
+import { getFriendRequestsKey } from "../utils/key";
 
 type UseGetFriendRequestProps = {
   direction: FriendRequestDirection;
@@ -11,69 +12,37 @@ type UseGetFriendRequestProps = {
 
 const useGetFriendRequest = ({ direction }: UseGetFriendRequestProps) => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [data, setData] = useState<FriendRequestItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const userId = useAuthStore((state) => state.user?.id);
   const [page, setPage] = useState(1);
-  const [retryCount, setRetryCount] = useState(0);
+  const query = useQuery({
+    queryKey: getFriendRequestsKey(userId, direction, page),
+    queryFn: () => {
+      if (!accessToken) {
+        throw new Error("Authentication required");
+      }
 
-  const retry = useCallback(() => {
-    setRetryCount((count) => count + 1);
-  }, []);
-
-  useEffect(() => {
-    let isCurrentRequest = true;
-
-    if (!accessToken) {
-      return () => {
-        isCurrentRequest = false;
-      };
-    }
-
-    Promise.resolve()
-      .then(() => {
-        if (!isCurrentRequest) {
-          return;
-        }
-
-        setLoading(true);
-        return relationshipQuery.getFriendRequests(accessToken, {
-          direction,
-          page,
-          limit: FRIEND_REQUESTS_LIMIT,
-        });
-      })
-      .then((requests) => {
-        if (isCurrentRequest && requests !== undefined) {
-          setData(requests);
-          setError(null);
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (isCurrentRequest) {
-          const errorMessage =
-            requestError instanceof ApiError || requestError instanceof Error
-              ? requestError.message
-              : "Unknown error";
-          setError(errorMessage);
-          setData(null);
-        }
-      })
-      .finally(() => {
-        if (isCurrentRequest) {
-          setLoading(false);
-        }
+      return relationshipQuery.getFriendRequests(accessToken, {
+        direction,
+        page,
+        limit: FRIEND_REQUESTS_LIMIT,
       });
+    },
+    enabled: Boolean(accessToken),
+  });
 
-    return () => {
-      isCurrentRequest = false;
-    };
-  }, [accessToken, direction, page, retryCount]);
+  const retry = () => {
+    void query.refetch();
+  };
 
   return {
-    data,
-    error,
-    loading,
+    data: accessToken && !query.error ? (query.data ?? null) : null,
+    error:
+      accessToken && query.error
+        ? query.error instanceof Error
+          ? query.error.message
+          : "Unknown error"
+        : null,
+    loading: accessToken ? query.isFetching : false,
     page,
     setPage,
     retry,

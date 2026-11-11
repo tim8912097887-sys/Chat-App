@@ -1,44 +1,41 @@
-import { useCallback, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
 import { relationshipQuery } from "../api/query/query";
-import { ApiError } from "../../../common/error/api-error";
 import { toast } from "react-toastify";
+import { getFriendRequestsKey } from "../utils/key";
 
 const useRejectFriend = () => {
+  const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [loading, setLoading] = useState(false);
-  const rejectFriendInProgressRef = useRef(false);
-
-  const rejectFriend = useCallback(
-    async (requestId: string) => {
-      if (!accessToken || rejectFriendInProgressRef.current) {
-        return;
+  const userId = useAuthStore((state) => state.user?.id);
+  const mutation = useMutation({
+    mutationFn: (requestId: string) => {
+      if (!accessToken) {
+        throw new Error("Authentication required");
       }
 
-      rejectFriendInProgressRef.current = true;
-
-      try {
-        setLoading(true);
-
-        await relationshipQuery.rejectFriendRequest(accessToken, requestId);
-      } catch (requestError: unknown) {
-        let errorMessage;
-        if (requestError instanceof ApiError || requestError instanceof Error) {
-          errorMessage = requestError.message;
-        } else {
-          errorMessage = "Unknow error";
-        }
-        toast.error(errorMessage);
-      } finally {
-        rejectFriendInProgressRef.current = false;
-        setLoading(false);
-      }
+      return relationshipQuery.rejectFriendRequest(accessToken, requestId);
     },
-    [accessToken],
-  );
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: getFriendRequestsKey(userId, "incoming", 1),
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Unknown error");
+    },
+  });
+
+  const rejectFriend = async (requestId: string) => {
+    if (!accessToken || mutation.isPending) {
+      return;
+    }
+
+    await mutation.mutateAsync(requestId).catch(() => undefined);
+  };
 
   return {
-    loading: accessToken ? loading : false,
+    loading: accessToken ? mutation.isPending : false,
     rejectFriend,
   };
 };

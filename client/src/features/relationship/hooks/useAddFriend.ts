@@ -1,48 +1,42 @@
-import { useCallback, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
 import { relationshipQuery } from "../api/query/query";
-import { ApiError } from "../../../common/error/api-error";
 import { toast } from "react-toastify";
+import { getFriendRequestsKey } from "../utils/key";
 
 const useAddFriend = () => {
+  const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [loading, setLoading] = useState(false);
-  const addFriendInProgressRef = useRef(false);
-
-  const addFriend = useCallback(
-    async (targetUserId: string) => {
-      if (!accessToken || addFriendInProgressRef.current) {
-        return;
+  const userId = useAuthStore((state) => state.user?.id);
+  const mutation = useMutation({
+    mutationFn: (targetUserId: string) => {
+      if (!accessToken) {
+        throw new Error("Authentication required");
       }
 
-      addFriendInProgressRef.current = true;
-
-      try {
-        setLoading(true);
-
-        const data = await relationshipQuery.createFriendRequest(
-          accessToken,
-          targetUserId,
-        );
-        toast.success(data.message);
-      } catch (requestError: unknown) {
-        let errorMessage;
-        if (requestError instanceof ApiError || requestError instanceof Error) {
-          errorMessage = requestError.message;
-        } else {
-          errorMessage = "Unknow error";
-        }
-        toast.error(errorMessage);
-      } finally {
-        addFriendInProgressRef.current = false;
-        setLoading(false);
-      }
+      return relationshipQuery.createFriendRequest(accessToken, targetUserId);
     },
-    [accessToken],
-  );
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({
+        queryKey: getFriendRequestsKey(userId, "outgoing", 1),
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Unknown error");
+    },
+  });
+
+  const addFriend = async (targetUserId: string) => {
+    if (!accessToken || mutation.isPending) {
+      return;
+    }
+
+    await mutation.mutateAsync(targetUserId).catch(() => undefined);
+  };
 
   return {
-    loading: accessToken ? loading : false,
+    loading: accessToken ? mutation.isPending : false,
     addFriend,
   };
 };

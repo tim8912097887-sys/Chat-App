@@ -4,6 +4,7 @@ import Avatar from "../../../../common/components/avatar/Avatar";
 import useLogout from "../../../auth/hooks/useLogout";
 import useLogoutAll from "../../../auth/hooks/useLogoutAll";
 import { Button } from "../../../../common/components/button";
+import { socket } from "../../../../realtime/socket";
 
 const AccountDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -33,6 +34,8 @@ const AccountDropdown = () => {
   }, []);
 
   const handleLogout = async () => {
+    // Disconnect first so server have enough time to listen to disconnect event
+    socket.disconnect();
     await logoutUser();
     setIsOpen(false);
   };
