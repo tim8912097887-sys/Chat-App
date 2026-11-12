@@ -21,7 +21,7 @@ const useAcceptFriend = () => {
         queryKey: getFriendRequestsKey(userId, "incoming", 1),
       });
       queryClient.invalidateQueries({
-        queryKey: getFriendsKey(userId, ""),
+        queryKey: getFriendsKey(userId),
       });
     },
     onError: (error) => {

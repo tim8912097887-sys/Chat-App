@@ -56,6 +56,11 @@ describe('login', () => {
 
       expectSuccessDataResponse(loginRes, 200, {
         accessToken: expect.any(String),
+        user: {
+          id: expect.any(String),
+          name: input.name,
+          imageUrl: null,
+        },
       });
     });
   });
@@ -142,6 +147,11 @@ describe('login', () => {
 
       expectSuccessDataResponse(loginRes, 200, {
         accessToken: expect.any(String),
+        user: {
+          id: expect.any(String),
+          name: input.name,
+          imageUrl: null,
+        },
       });
       const user = await userRepository.findByEmail(input.email);
       expect(user?.loginAttempt).toBe(0);

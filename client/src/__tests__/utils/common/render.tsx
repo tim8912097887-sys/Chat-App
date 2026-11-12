@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -15,14 +16,17 @@ export const customRender = ({
   initialEntries,
 }: CustomRenderProps) => {
   const user = userEvent.setup();
+  const queryClient = new QueryClient();
   render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <Routes>
-        {uiArray.map(({ ui, path }) => {
-          return <Route path={path} element={ui} />;
-        })}
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          {uiArray.map(({ ui, path }) => {
+            return <Route path={path} element={ui} />;
+          })}
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
   return { user };

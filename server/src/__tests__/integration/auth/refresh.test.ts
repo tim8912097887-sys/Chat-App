@@ -27,6 +27,11 @@ describe('refresh', () => {
 
       expectSuccessDataResponse(res, 200, {
         accessToken: expect.any(String),
+        user: {
+          id: expect.any(String),
+          name: 'Test User',
+          imageUrl: null,
+        },
       });
       expect(userRecord[0]?.tokenVersion).toBe(0);
       expect(newRefreshToken?.revokedAt).toBeNull();
@@ -100,6 +105,11 @@ describe('refresh', () => {
 
       expectSuccessDataResponse(firstRes, 200, {
         accessToken: expect.any(String),
+        user: {
+          id: expect.any(String),
+          name: 'Test User',
+          imageUrl: null,
+        },
       });
       expect(secondRes.status).toBe(401);
       expect(secondRes.body).toMatchObject({
@@ -144,6 +154,11 @@ describe('refresh', () => {
 
       expectSuccessDataResponse(first, 200, {
         accessToken: expect.any(String),
+        user: {
+          id: expect.any(String),
+          name: 'Test User',
+          imageUrl: null,
+        },
       });
       expect(second.status).toBe(401);
       expect(second.body).toMatchObject({

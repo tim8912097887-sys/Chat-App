@@ -96,6 +96,7 @@ const AddFriendSection = () => {
           <Button
             type="button"
             loading={addLoading}
+            disabled={addLoading}
             size="sm"
             onClick={() => handleAddFriend(data.id)}
           >
