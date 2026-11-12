@@ -9,7 +9,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { authQuery } from "../api/query/query";
 import { ApiError } from "../../../common/error/api-error";
 import SubmitError from "../components/SubmitError";
-import { toast } from "react-toastify";
 import { useAuthStore } from "../store/store";
 import { useNavigate } from "react-router";
 
@@ -30,7 +29,6 @@ export default function LoginPage() {
         accessToken: loginResponse.accessToken,
         user: loginResponse.user,
       });
-      toast.success("Logged in successfully.");
       navigation("/");
     } catch (error) {
       let message = "Unable to log in. Please try again.";

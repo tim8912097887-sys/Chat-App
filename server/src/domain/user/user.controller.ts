@@ -7,8 +7,12 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   search: RequestHandler = async (req, res) => {
+    const { userId, tokenVersion } = req.accessToken!;
     const { q } = req.query as SearchCodeQuery;
-    const user = await this.userService.searchActiveBySearchCode(q);
+    const user = await this.userService.searchActiveBySearchCode(
+      { userId, tokenVersion },
+      q,
+    );
     this.sendResponse(res, user);
   };
 

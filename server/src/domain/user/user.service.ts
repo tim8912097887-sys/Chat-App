@@ -34,7 +34,11 @@ export class UserService {
     return this.toUserDomain(user);
   }
 
-  async searchActiveBySearchCode(searchCode: string): Promise<PublicUser | null> {
+  async searchActiveBySearchCode(
+    identity: UserIdentity,
+    searchCode: string,
+  ): Promise<PublicUser | null> {
+    await this.validateUserIdentity(identity);
     const user = await this.userRepository.findActiveBySearchCode(searchCode);
     return user ? this.toPublicUser(user) : null;
   }
@@ -43,10 +47,7 @@ export class UserService {
     identity: UserIdentity,
     pagination: PaginationOptions,
   ): Promise<(PublicUser & { isOnline: boolean })[]> {
-    const user = await this.userRepository.findById(identity.userId);
-    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== identity.tokenVersion) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
+    await this.validateUserIdentity(identity);
 
     const relationships = await this.relationshipRepository.findFriendsByUserId(identity.userId);
     const friendsId = relationships
@@ -116,6 +117,13 @@ export class UserService {
       createdAt: userDocument.createdAt,
       updatedAt: userDocument.updatedAt,
     };
+  }
+
+  private async validateUserIdentity(identity: UserIdentity): Promise<void> {
+    const user = await this.userRepository.findById(identity.userId);
+    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== identity.tokenVersion) {
+      throw new InvalidUserTokenError('Invalid user token');
+    }
   }
 
   private toPublicUser(user: UserSearchRecord): PublicUser {
