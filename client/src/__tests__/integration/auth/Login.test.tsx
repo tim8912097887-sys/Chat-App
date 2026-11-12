@@ -1,13 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { toast } from "react-toastify";
 import LoginPage from "../../../features/auth/pages/LoginPage";
 import SignupPage from "../../../features/auth/pages/SignupPage";
 import { customRender } from "../../utils/common/render";
 import { authBasedUrl } from "../../utils/auth/http";
 import { errorResponse } from "../../utils/common/response";
 import { server } from "../../utils/common/server";
+import { Route, Routes } from "react-router";
+import AuthGuard from "../../../app/components/AuthGuard";
+import RelationshipHomePage from "../../../features/relationship/pages/RelationshipHomePage";
 
 describe("Login", () => {
   describe("Success Load and Page Switch", () => {
@@ -20,16 +22,34 @@ describe("Login", () => {
       expect(
         screen.getByText(/Log in to continue your conversations./),
       ).toBeInTheDocument();
-      expect(screen.getByRole("textbox", { name: /email/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: /email/i }),
+      ).toBeInTheDocument();
       expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Create an account/ })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Log in/ })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Create an account/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Log in/ }),
+      ).toBeInTheDocument();
     });
 
-    it("when successfully login should display login success notification", async () => {
-      const successToast = vi.spyOn(toast, "success");
+    it("when successfully login should navigate to relationship page", async () => {
       const { user } = customRender({
-        uiArray: [{ ui: <LoginPage />, path: "/login" }],
+        uiArray: [
+          { ui: <LoginPage />, path: "/login" },
+          {
+            ui: (
+              <Routes>
+                {/* Parent route using AuthGuard layout with an Outlet */}
+                <Route element={<AuthGuard />}>
+                  <Route path="/" element={<RelationshipHomePage />} />
+                </Route>
+              </Routes>
+            ),
+            path: "/",
+          },
+        ],
         initialEntries: ["/login"],
       });
 
@@ -40,9 +60,12 @@ describe("Login", () => {
       await user.type(screen.getByLabelText(/password/i), "Password123!");
       await user.click(screen.getByRole("button", { name: /Log in/ }));
 
-      await waitFor(() => {
-        expect(successToast).toHaveBeenCalledWith("Logged in successfully.");
-      });
+      expect(
+        await screen.findByRole("heading", { level: 1, name: /chatter/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /user account settings menu/i }),
+      ).toBeInTheDocument();
     });
 
     it("when click create account link should navigate to signup page", async () => {
@@ -202,7 +225,7 @@ describe("Login", () => {
               code: "INTERNAL_SERVER_ERROR",
               detail: "Unable to log in. Please try again.",
             }),
-            { status: 500 },
+            { status: 409 },
           ),
         ),
       );

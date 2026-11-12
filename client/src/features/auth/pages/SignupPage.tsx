@@ -14,7 +14,6 @@ import { authQuery } from "../api/query/query";
 import { ApiError } from "../../../common/error/api-error";
 import SubmitError from "../components/SubmitError";
 import { useNavigate } from "react-router";
-import { toast } from "react-toastify";
 
 export default function SignupPage() {
   const navigation = useNavigate();
@@ -30,7 +29,6 @@ export default function SignupPage() {
     clearErrors();
     try {
       await authQuery.signup(input);
-      toast.success("Signed up successfully.");
       navigation("/login");
     } catch (error) {
       let message = "Unable to log in. Please try again.";

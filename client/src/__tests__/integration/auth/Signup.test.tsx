@@ -166,7 +166,7 @@ describe("Signup", () => {
       await user.click(screen.getByRole("button", { name: /Create account/ }));
 
       expect(
-        await screen.findByRole("button", { name: /Log in/ }),
+        await screen.findByRole("button", { name: /Log in/i }),
       ).toBeInTheDocument();
       expect(uploadedRequestBody).toContain('filename="profile.png"');
       expect(uploadedRequestBody).toContain("image contents");
@@ -276,7 +276,7 @@ describe("Signup", () => {
               code: "INTERNAL_SERVER_ERROR",
               detail: "Unable to create account. Please try again.",
             }),
-            { status: 500 },
+            { status: 409 },
           );
         }),
       );

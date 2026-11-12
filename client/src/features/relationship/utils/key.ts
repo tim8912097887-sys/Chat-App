@@ -2,7 +2,7 @@ import type { FriendRequestDirection } from "../types";
 
 export const getFriendsKey = (
   userId: string | undefined,
-  searchString: string,
+  searchString?: string,
 ) => {
   return ["friends", userId, searchString];
 };

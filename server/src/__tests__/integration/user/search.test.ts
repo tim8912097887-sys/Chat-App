@@ -16,7 +16,11 @@ import {
   invalidFriendSearchQueries,
   invalidSearchQueries,
 } from '../../utils/user/invalid-inputs.js';
-import { friendSearchRequest, signupAndLogin } from '../../utils/user/query.js';
+import {
+  friendSearchRequest,
+  searchUserRequest,
+  signupAndLogin,
+} from '../../utils/user/query.js';
 import { acceptRelationship, inviteFriend } from '../../utils/relationship/query.js';
 
 describe('user search', () => {
@@ -26,6 +30,7 @@ describe('user search', () => {
 
   describe('success', () => {
     it('when search code for non-existent user should return null', async () => {
+      const { accessToken } = await signupAndLogin();
       const input = signupUserInput({});
       await api().post(SIGNUP_URL).send(input);
       const user = (await userModel
@@ -34,14 +39,15 @@ describe('user search', () => {
         .lean()
         .exec()) as { searchCode: string };
 
-      const response = await api()
-        .get(USER_SEARCH_URL)
-        .query({ q: user.searchCode.substring(0, 6) + '29' });
+      const response = await searchUserRequest(accessToken).query({
+        q: user.searchCode.substring(0, 6) + '29',
+      });
 
       expectSuccessDataResponse(response, 200, null);
     });
 
     it('when search code for not active user should return null', async () => {
+      const { accessToken } = await signupAndLogin();
       const input = signupUserInput({});
       await api().post(SIGNUP_URL).send(input);
       await userModel.updateOne({ email: input.email }, { status: 'DISABLED' });
@@ -51,12 +57,13 @@ describe('user search', () => {
         .lean()
         .exec()) as { searchCode: string };
 
-      const response = await api().get(USER_SEARCH_URL).query({ q: user.searchCode });
+      const response = await searchUserRequest(accessToken).query({ q: user.searchCode });
 
       expectSuccessDataResponse(response, 200, null);
     });
 
     it('when search code for active user should return user', async () => {
+      const { accessToken } = await signupAndLogin();
       const input = signupUserInput({});
       await api().post(SIGNUP_URL).send(input);
       const user = (await userModel
@@ -65,7 +72,7 @@ describe('user search', () => {
         .lean()
         .exec()) as { searchCode: string };
 
-      const response = await api().get(USER_SEARCH_URL).query({ q: user.searchCode });
+      const response = await searchUserRequest(accessToken).query({ q: user.searchCode });
 
       expectSuccessDataResponse(response, 200, {
         id: expect.any(String),
@@ -138,7 +145,8 @@ describe('user search', () => {
     it.each(invalidSearchQueries)(
       'when search receives $description should return 400',
       async ({ query, field }) => {
-        const response = await api().get(USER_SEARCH_URL).query(query);
+        const { accessToken } = await signupAndLogin();
+        const response = await searchUserRequest(accessToken).query(query);
 
         expectValidationError(response, field);
       },
@@ -156,6 +164,40 @@ describe('user search', () => {
   });
 
   describe('authentication fail', () => {
+    it('when search receives no access token should return 401', async () => {
+      const response = await api().get(USER_SEARCH_URL).query({ q: '12345678' });
+
+      expectAuthError(response, 'Missing access token');
+    });
+
+    it('when search uses a token for a non-existent user should return 401', async () => {
+      const { email, accessToken } = await signupAndLogin();
+      await userModel.deleteOne({ email });
+
+      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
+
+      expectAuthError(response, 'Invalid user token');
+    });
+
+    it('when search uses a token for an inactive user should return 401', async () => {
+      const { email, accessToken } = await signupAndLogin();
+      await userModel.updateOne({ email }, { $set: { status: 'DISABLED' } });
+
+      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
+
+      expectAuthError(response, 'Invalid user token');
+    });
+
+    it('when search uses a token with a stale token version should return 401', async () => {
+      const { accessToken, refreshCookie } = await signupAndLogin();
+      const logoutResponse = await api().post(LOGOUT_ALL_URL).set('Cookie', refreshCookie);
+      expect(logoutResponse.status).toBe(200);
+
+      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
+
+      expectAuthError(response, 'Invalid user token');
+    });
+
     it.each([
       {
         description: 'no access token',
@@ -215,11 +257,12 @@ describe('user search', () => {
 
   describe('server error', () => {
     it('when user repository fails during search should return 500 with server error', async () => {
+      const { accessToken } = await signupAndLogin();
       vi.spyOn(MongoUserRepository.prototype, 'findActiveBySearchCode').mockRejectedValue(
         new Error('database unavailable'),
       );
 
-      const response = await api().get(USER_SEARCH_URL).query({ q: '12345678' });
+      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
 
       expectServerError(response);
     });
