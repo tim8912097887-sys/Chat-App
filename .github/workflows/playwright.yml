@@ -15,7 +15,7 @@ jobs:
           node-version: lts/*
       - name: Create Server Environment File
         run: |
-          echo "NODE_ENV=development" >> ./server/.env
+          echo "NODE_ENV=production" >> ./server/.env
           echo "PORT=3000" >> ./server/.env
           echo "LOG_LEVEL=info" >> ./server/.env
           echo "DATABASE_URL=mongodb://db:27017/chat-app?replicaSet=rs0" >> ./server/.env
@@ -36,11 +36,6 @@ jobs:
 
       - name: Start Docker Compose Services
         run: docker compose up -d --build
-      - name: Debug Container Logs on Failure
-        if: failure()
-        run: |
-          docker compose logs server
-          docker compose logs db
       - name: Install dependencies
         run: npm install -g pnpm && pnpm install
       - name: Install Playwright Browsers
