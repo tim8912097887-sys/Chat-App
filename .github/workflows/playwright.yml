@@ -1,0 +1,53 @@
+name: Playwright Tests
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Create Server Environment File
+        run: |
+          echo "NODE_ENV=development" >> ./server/.env
+          echo "PORT=3000" >> ./server/.env
+          echo "LOG_LEVEL=info" >> ./server/.env
+          echo "DATABASE_URL=mongodb://db:27017/chat-app?replicaSet=rs0" >> ./server/.env
+          echo "CORS_ORIGIN=http://client:80" >> ./server/.env
+          echo "JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}" >> ./server/.env
+          echo "JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}" >> ./server/.env
+          echo "JWT_ISSUER=auth-service" >> ./server/.env
+          echo "ACCESS_TOKEN_TTL_SECONDS=900" >> ./server/.env
+          echo "REFRESH_TOKEN_TTL_SECONDS=604800" >> ./server/.env
+          echo "BCRYPT_COST=12" >> ./server/.env
+          echo "CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}" >> ./server/.env
+          echo "CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}" >> ./server/.env
+          echo "CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}" >> ./server/.env
+
+      - name: Create Client Environment File
+        run: |
+          echo "VITE_API_URL=http://localhost:3000" > ./client/.env
+
+      - name: Start Docker Compose Services
+        run: docker compose up -d --build
+      - name: Install dependencies
+        run: npm install -g pnpm && pnpm install
+      - name: Install Playwright Browsers
+        run: pnpm exec playwright install --with-deps
+      - name: Run Playwright tests
+        run: pnpm exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down -v
