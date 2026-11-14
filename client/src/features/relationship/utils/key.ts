@@ -4,13 +4,20 @@ export const getFriendsKey = (
   userId: string | undefined,
   searchString?: string,
 ) => {
-  return ["friends", userId, searchString];
+  if (searchString) {
+    return ["friends", userId, searchString];
+  }
+
+  return ["friends", userId];
 };
 
 export const getFriendRequestsKey = (
   userId: string | undefined,
   direction: FriendRequestDirection,
-  page: number,
+  page?: number,
 ) => {
-  return ["friend-requests", userId, direction, page];
+  if (page) {
+    return ["friend-requests", userId, direction, page];
+  }
+  return ["friend-requests", userId, direction];
 };

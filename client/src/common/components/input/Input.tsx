@@ -20,6 +20,7 @@ export function Input({
 }: InputProps) {
   return (
     <input
+      formNoValidate
       id={id}
       type={type}
       className={[
