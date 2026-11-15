@@ -7,6 +7,7 @@ import RelationshipHomePage from "../features/relationship/pages/RelationshipHom
 import AuthGuard from "./components/AuthGuard";
 import GuestGuard from "./components/GuestGuard";
 import AuthenticatedLayout from "../features/relationship/layouts/AuthenticatedLayout";
+import ProfilePage from "../features/user/pages/ProfilePage";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
               {
                 index: true,
                 element: <RelationshipHomePage />,
+              },
+              {
+                path: "profile",
+                element: <ProfilePage />,
               },
             ],
           },
@@ -47,7 +52,6 @@ const router = createBrowserRouter([
     element: <NotFoundPage />,
   },
 ]);
-
 export function AppRouter() {
   return <RouterProvider router={router} />;
 }

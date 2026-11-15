@@ -6,6 +6,12 @@ import type { FriendSearchQuery, SearchCodeQuery } from './dto/query-params.js';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  profile: RequestHandler = async (req, res) => {
+    const { userId, tokenVersion } = req.accessToken!;
+    const profile = await this.userService.getProfile({ userId, tokenVersion });
+    this.sendResponse(res, profile);
+  };
+
   search: RequestHandler = async (req, res) => {
     const { userId, tokenVersion } = req.accessToken!;
     const { q } = req.query as SearchCodeQuery;

@@ -13,14 +13,17 @@ import { relationshipBasedUrl } from "../../utils/relationship/http";
 describe("Create friendship", () => {
   describe("Success Load and Create", () => {
     it("when send the friend invite success should add newone in send request section", async () => {
-      const { user } = renderAuthenticatedApp();
+      let friendshipCreated = false;
       server.use(
         http.get(`${userBasedUrl}/search`, () =>
           HttpResponse.json(
             successResponse({
-              id: "test-id",
-              name: "test-name",
-              imageUrl: null,
+              user: {
+                id: "test-id",
+                name: "test-name",
+                imageUrl: null,
+              },
+              state: friendshipCreated ? "invite" : "none",
             }),
           ),
         ),
@@ -29,13 +32,21 @@ describe("Create friendship", () => {
             successResponse([
               {
                 requestId: "test-request-id",
+                userId: "test-id",
                 name: "test-name",
                 imageUrl: null,
               },
             ]),
           ),
         ),
+        http.post(`${relationshipBasedUrl}/`, () => {
+          friendshipCreated = true;
+          return HttpResponse.json(
+            successResponse({ message: "Successfully create" }),
+          );
+        }),
       );
+      const { user } = renderAuthenticatedApp();
 
       await user.type(
         screen.getByRole("textbox", { name: /8-character search code/i }),
@@ -48,6 +59,11 @@ describe("Create friendship", () => {
       await user.click(screen.getByRole("button", { name: /Send Request/i }));
       await user.click(screen.getByRole("button", { name: /Sent/i }));
 
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: /Send Request/i }),
+        ).not.toBeInTheDocument(),
+      );
       expect(
         await screen.findByText(/Pending confirmation/i),
       ).toBeInTheDocument();
@@ -61,9 +77,12 @@ describe("Create friendship", () => {
         http.get(`${userBasedUrl}/search`, () =>
           HttpResponse.json(
             successResponse({
-              id: "test-id",
-              name: "test-name",
-              imageUrl: null,
+              user: {
+                id: "test-id",
+                name: "test-name",
+                imageUrl: null,
+              },
+              state: "none",
             }),
           ),
         ),
@@ -74,6 +93,7 @@ describe("Create friendship", () => {
                 ? [
                     {
                       requestId: "test-request-id",
+                      userId: "existing-request-id",
                       name: "existing-request",
                       imageUrl: null,
                     },

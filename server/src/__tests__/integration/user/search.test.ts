@@ -16,11 +16,7 @@ import {
   invalidFriendSearchQueries,
   invalidSearchQueries,
 } from '../../utils/user/invalid-inputs.js';
-import {
-  friendSearchRequest,
-  searchUserRequest,
-  signupAndLogin,
-} from '../../utils/user/query.js';
+import { friendSearchRequest, searchUserRequest, signupAndLogin } from '../../utils/user/query.js';
 import { acceptRelationship, inviteFriend } from '../../utils/relationship/query.js';
 
 describe('user search', () => {
@@ -75,11 +71,110 @@ describe('user search', () => {
       const response = await searchUserRequest(accessToken).query({ q: user.searchCode });
 
       expectSuccessDataResponse(response, 200, {
-        id: expect.any(String),
-        name: expect.any(String),
-        imageUrl: null,
+        user: {
+          id: expect.any(String),
+          name: expect.any(String),
+          imageUrl: null,
+        },
+        state: 'none',
       });
     });
+
+    it('when searching by own search code should return self state', async () => {
+      const { accessToken, email } = await signupAndLogin();
+      const user = await userModel.findOne({ email }).select({ searchCode: 1 });
+      expect(user).not.toBeNull();
+
+      const response = await searchUserRequest(accessToken).query({ q: user!.searchCode });
+
+      expect(response.body.data).toMatchObject({
+        user: { id: user!._id.toString() },
+        state: 'self',
+      });
+    });
+
+    it('when the searched user has a pending request from the current user should return invite state', async () => {
+      const { accessToken, email } = await signupAndLogin();
+      const requester = await userModel.findOne({ email });
+      const { email: recipientEmail } = await signupAndLogin();
+      const recipient = await userModel
+        .findOne({ email: recipientEmail })
+        .select({ searchCode: 1 });
+      expect(requester).not.toBeNull();
+      expect(recipient).not.toBeNull();
+      await friendshipModel.create({
+        requestedBy: requester!._id.toString(),
+        recipient: recipient!._id.toString(),
+        status: 'PENDING',
+      });
+
+      const response = await searchUserRequest(accessToken).query({ q: recipient!.searchCode });
+
+      expect(response.body.data.state).toBe('invite');
+    });
+
+    it('when the searched user has a pending request to the current user should return recipient state', async () => {
+      const { accessToken, email } = await signupAndLogin();
+      const recipient = await userModel.findOne({ email });
+      const { email: requesterEmail } = await signupAndLogin();
+      const requester = await userModel
+        .findOne({ email: requesterEmail })
+        .select({ searchCode: 1 });
+      expect(recipient).not.toBeNull();
+      expect(requester).not.toBeNull();
+      await friendshipModel.create({
+        requestedBy: requester!._id.toString(),
+        recipient: recipient!._id.toString(),
+        status: 'PENDING',
+      });
+
+      const response = await searchUserRequest(accessToken).query({ q: requester!.searchCode });
+
+      expect(response.body.data.state).toBe('recipient');
+    });
+
+    it('when the searched user is an accepted friend should return friend state', async () => {
+      const { accessToken, email } = await signupAndLogin();
+      const requester = await userModel.findOne({ email });
+      const { email: friendEmail } = await signupAndLogin();
+      const friend = await userModel.findOne({ email: friendEmail }).select({ searchCode: 1 });
+      expect(requester).not.toBeNull();
+      expect(friend).not.toBeNull();
+      await friendshipModel.create({
+        requestedBy: requester!._id.toString(),
+        recipient: friend!._id.toString(),
+        status: 'ACCEPTED',
+      });
+
+      const response = await searchUserRequest(accessToken).query({ q: friend!.searchCode });
+
+      expect(response.body.data.state).toBe('friend');
+    });
+
+    it.each([{ currentUserIsRequester: true }, { currentUserIsRequester: false }])(
+      'when the existing relationship is rejected should return none regardless of requester direction',
+      async ({ currentUserIsRequester }) => {
+        const { accessToken, email } = await signupAndLogin();
+        const currentUser = await userModel.findOne({ email });
+        const { email: otherEmail } = await signupAndLogin();
+        const otherUser = await userModel.findOne({ email: otherEmail }).select({ searchCode: 1 });
+        expect(currentUser).not.toBeNull();
+        expect(otherUser).not.toBeNull();
+        await friendshipModel.create({
+          requestedBy: currentUserIsRequester
+            ? currentUser!._id.toString()
+            : otherUser!._id.toString(),
+          recipient: currentUserIsRequester
+            ? otherUser!._id.toString()
+            : currentUser!._id.toString(),
+          status: 'REJECTED',
+        });
+
+        const response = await searchUserRequest(accessToken).query({ q: otherUser!.searchCode });
+
+        expect(response.body.data.state).toBe('none');
+      },
+    );
 
     it('when search for friends with no friends should return empty array', async () => {
       const { accessToken } = await signupAndLogin();
@@ -107,10 +202,11 @@ describe('user search', () => {
         const inviteResponse = await inviteFriend(ownerAccessToken, friend!._id.toString());
         expect(inviteResponse.status).toBe(201);
         const request = await friendshipModel.findOne({
-          userIds: { $all: [owner!._id.toString(), friend!._id.toString()], $size: 2 },
+          requestedBy: owner!._id.toString(),
+          recipient: friend!._id.toString(),
         });
         expect(request).not.toBeNull();
-        const acceptResponse = await acceptRelationship(friendAccessToken, request!._id.toString());
+        const acceptResponse = await acceptRelationship(friendAccessToken, owner!._id.toString());
         expect(acceptResponse.status).toBe(200);
 
         friends.push({
@@ -265,6 +361,21 @@ describe('user search', () => {
       const response = await searchUserRequest(accessToken).query({ q: '12345678' });
 
       expectServerError(response);
+    });
+
+    it('when relationship repository fails during search should return 500 with server error', async () => {
+      const { accessToken } = await signupAndLogin();
+      const { email } = await signupAndLogin();
+      const user = await userModel.findOne({ email }).select({ searchCode: 1 });
+      expect(user).not.toBeNull();
+      const relationshipRepositorySpy = vi
+        .spyOn(MongoRelationshipRepository.prototype, 'findByUsers')
+        .mockRejectedValue(new Error('database unavailable'));
+
+      const response = await searchUserRequest(accessToken).query({ q: user!.searchCode });
+
+      expectServerError(response);
+      expect(relationshipRepositorySpy).toHaveBeenCalledOnce();
     });
 
     it('when relationship repository fails during friend search should return 500 with server error', async () => {

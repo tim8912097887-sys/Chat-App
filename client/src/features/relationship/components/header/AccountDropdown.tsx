@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { useAuthStore } from "../../../auth/store/store";
 import Avatar from "../../../../common/components/avatar/Avatar";
 import useLogout from "../../../auth/hooks/useLogout";
@@ -8,25 +9,27 @@ import { socket } from "../../../../realtime/socket";
 
 const AccountDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((s) => s.user);
+
   const { loading: logoutLoading, logoutUser } = useLogout();
   const { loading: logoutAllLoading, logoutAllUser } = useLogoutAll();
 
-  // Close dropdown on outside click or Esc key
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // !menuRef.current.contains(event.target)
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsOpen(false);
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
@@ -34,7 +37,6 @@ const AccountDropdown = () => {
   }, []);
 
   const handleLogout = async () => {
-    // Disconnect first so server have enough time to listen to disconnect event
     socket.disconnect();
     await logoutUser();
     setIsOpen(false);
@@ -45,16 +47,19 @@ const AccountDropdown = () => {
     setIsOpen(false);
   };
 
+  const isLoggingOut = logoutLoading || logoutAllLoading;
+
   return (
     <div className="relative self-end sm:self-auto" ref={menuRef}>
-      {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label="User account settings menu"
-        className="flex items-center gap-3 py-2 px-3.5 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+        className="flex items-center gap-3 py-2 px-3.5 rounded-2xl
+          border border-slate-200/80 bg-white hover:bg-slate-50
+          transition-all"
       >
         <Avatar
           imageUrl={user?.imageUrl ?? null}
@@ -64,45 +69,36 @@ const AccountDropdown = () => {
         />
 
         <div className="text-left hidden sm:block">
-          <span className="block text-sm font-semibold text-slate-800 leading-tight">
+          <span className="block text-sm font-semibold text-slate-800">
             My account
           </span>
-          <span className="block text-xs text-slate-400 font-normal">
-            Account settings
-          </span>
+          <span className="block text-xs text-slate-400">Account settings</span>
         </div>
-
-        <svg
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div
           role="menu"
-          aria-orientation="vertical"
-          className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-xl border border-slate-100 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+          className="absolute right-0 mt-2 w-56 rounded-2xl
+            bg-white shadow-xl border border-slate-100 p-1.5 z-50"
         >
-          <div className="px-3 py-2 border-b border-slate-100 mb-1">
-            <p className="text-xs font-semibold text-slate-800">Signed in as</p>
-            <p className="text-xs text-slate-500 truncate">user@example.com</p>
-          </div>
+          <Link
+            to="/profile"
+            role="menuitem"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2.5
+              text-sm text-slate-700 hover:bg-slate-50 rounded-xl"
+          >
+            <span>👤</span>
+            My Profile
+          </Link>
+
+          <div className="border-t border-slate-100 my-1" />
 
           <Button
             role="menuitem"
             unstyled={true}
-            disabled={logoutLoading || logoutAllLoading}
+            disabled={isLoggingOut}
             loading={logoutLoading}
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition text-left"
@@ -127,7 +123,7 @@ const AccountDropdown = () => {
             role="menuitem"
             unstyled={true}
             onClick={handleLogoutAll}
-            disabled={logoutLoading || logoutAllLoading}
+            disabled={isLoggingOut}
             loading={logoutAllLoading}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-xl transition text-left"
           >

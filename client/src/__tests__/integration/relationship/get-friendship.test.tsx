@@ -8,6 +8,7 @@ import { relationshipBasedUrl } from "../../utils/relationship/http";
 
 type FriendRequest = {
   requestId: string;
+  userId: string;
   name: string;
   imageUrl: string | null;
 };
@@ -54,6 +55,7 @@ describe("Get friendship", () => {
           [
             {
               requestId: "incoming-request-id",
+              userId: "incoming-user-id",
               name: "incoming-user",
               imageUrl: null,
             },
@@ -109,6 +111,7 @@ describe("Get friendship", () => {
           [
             {
               requestId: "outgoing-request-id",
+              userId: "outgoing-user-id",
               name: "outgoing-user",
               imageUrl: null,
             },

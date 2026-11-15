@@ -15,6 +15,7 @@ import {
 } from "../../features/relationship/utils/key";
 import { useAuthStore } from "../../features/auth/store/store";
 import { usePresenceStore } from "../../features/relationship/stores/store";
+import { getSearchUserKey } from "../../features/user/utils/key";
 
 const useRealtimeEvents = () => {
   const userId = useAuthStore((state) => state.user?.id);
@@ -38,6 +39,9 @@ const useRealtimeEvents = () => {
           queryClient.invalidateQueries({
             queryKey: getFriendRequestsKey(userId, "incoming", 1),
           });
+          queryClient.invalidateQueries({
+            queryKey: getSearchUserKey(userId),
+          });
           break;
         }
 
@@ -48,12 +52,18 @@ const useRealtimeEvents = () => {
           queryClient.invalidateQueries({
             queryKey: getFriendsKey(userId, ""),
           });
+          queryClient.invalidateQueries({
+            queryKey: getSearchUserKey(userId),
+          });
           break;
         }
 
         case FRIEND_REQUEST_REJECTED_EVENT: {
           queryClient.invalidateQueries({
             queryKey: getFriendRequestsKey(userId, "outgoing", 1),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getSearchUserKey(userId),
           });
           break;
         }

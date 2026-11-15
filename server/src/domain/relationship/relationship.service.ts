@@ -7,7 +7,9 @@ import type {
   FriendRequestPagination,
 } from './relationship.types.js';
 import type { RelationshipRepository } from './relationship.repository.js';
-import { PublicUserRecord } from '../user/user.types.js';
+import type { PublicUserRecord } from '../user/user.types.js';
+import type { UserDocument } from '../user/user.model.js';
+import type { FriendshipDocument } from './friendships.model.js';
 import { SendFriendRequestToSelfError } from './error/send-friend-request-to-self.js';
 import { FriendshipAlreadyExistError } from './error/friendship-already-exist.js';
 import { InvalidFriendshipChangeError } from './error/invalid-friendship-change.js';
@@ -36,10 +38,9 @@ export class RelationshipService {
       pagination,
     );
     const otherUserIds = requests.map((request) =>
-      request.userIds.find((userId) => userId !== identity.userId),
+      request.requestedBy === identity.userId ? request.recipient : request.requestedBy,
     );
-    const validOtherUserIds = otherUserIds.filter((id): id is string => id !== undefined);
-    const users = await this.userRepository.findPublicUsersByIds(validOtherUserIds);
+    const users = await this.userRepository.findPublicUsersByIds(otherUserIds);
     const userMap = new Map<string, PublicUserRecord>(users.map((user) => [user._id, user]));
 
     return requests.flatMap((request, index) => {
@@ -52,6 +53,7 @@ export class RelationshipService {
       return [
         {
           requestId: request._id.toString(),
+          userId: otherUserId,
           name: user.name,
           imageUrl: user.imageUrl ?? null,
         },
@@ -70,14 +72,16 @@ export class RelationshipService {
 
     await this.getVerifiedActiveUser(input.targetUserId);
 
-    const pairKey = [identity.userId, input.targetUserId].sort().join(':');
-
-    const existing = await this.relationshipRepository.findByUsers(pairKey);
+    const existing = await this.relationshipRepository.findByUsers(
+      identity.userId,
+      input.targetUserId,
+    );
     if (existing) {
       if (existing.status === 'REJECTED') {
         const reopened = await this.relationshipRepository.reopenRejectedRequest(
           existing._id,
           identity.userId,
+          input.targetUserId,
         );
         if (reopened) {
           this.realtimeEvents.publishToUser(
@@ -100,7 +104,6 @@ export class RelationshipService {
     const friendRequest = await this.relationshipRepository.createFriendRequest(
       identity.userId,
       input.targetUserId,
-      pairKey,
     );
 
     this.realtimeEvents.publishToUser(
@@ -116,31 +119,41 @@ export class RelationshipService {
     );
   }
 
-  async acceptFriendRequest(identity: FriendRequestIdentity, requestId: string): Promise<void> {
-    await this.updateRequestStatus(identity, requestId, 'ACCEPTED');
+  async acceptFriendRequest(identity: FriendRequestIdentity, requesterId: string): Promise<void> {
+    await this.updateRequestStatus(identity, requesterId, 'ACCEPTED');
   }
 
-  async rejectFriendRequest(identity: FriendRequestIdentity, requestId: string): Promise<void> {
-    await this.updateRequestStatus(identity, requestId, 'REJECTED');
+  async rejectFriendRequest(identity: FriendRequestIdentity, requesterId: string): Promise<void> {
+    await this.updateRequestStatus(identity, requesterId, 'REJECTED');
   }
 
   private async updateRequestStatus(
     identity: FriendRequestIdentity,
-    requestId: string,
+    requesterId: string,
     status: 'ACCEPTED' | 'REJECTED',
   ): Promise<void> {
     const user = await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
-    const request = await this.relationshipRepository.findPendingRequestById(requestId);
-    if (
-      !request ||
-      !request.userIds.includes(identity.userId) ||
-      request.requestedBy === identity.userId
-    ) {
+    const request = await this.relationshipRepository.findPendingRequestByUsers(
+      requesterId,
+      identity.userId,
+    );
+    if (!request) {
       throw new InvalidFriendshipChangeError('Friend request is not available to this user');
     }
 
+    await this.completeRequestStatusUpdate(user, request, status);
+  }
+
+  private async completeRequestStatusUpdate(
+    user: UserDocument,
+    request: FriendshipDocument,
+    status: 'ACCEPTED' | 'REJECTED',
+  ): Promise<void> {
     await this.getVerifiedActiveUser(request.requestedBy);
-    const updated = await this.relationshipRepository.updatePendingRequestStatus(requestId, status);
+    const updated = await this.relationshipRepository.updatePendingRequestStatus(
+      request._id,
+      status,
+    );
     if (!updated) throw new InvalidFriendshipChangeError('Friend request is no longer pending');
 
     const eventStatus =

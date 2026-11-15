@@ -1,43 +1,54 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
+import { readQueryRetry } from "../../../common/query/retry";
 import { userQuery } from "../api/query/query";
+import { getSearchUserKey } from "../utils/key";
 
 const useSearchUser = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [hasSearch, setHasSearch] = useState(false);
-  const mutation = useMutation({
-    mutationFn: (searchResult: string) => {
+  const userId = useAuthStore((state) => state.user?.id);
+  const [searchResult, setSearchResult] = useState("");
+  const [isFetch, setIsFetch] = useState(false);
+  const query = useQuery({
+    ...readQueryRetry,
+    queryKey: getSearchUserKey(userId, searchResult),
+    queryFn: () => {
       if (!accessToken) {
         throw new Error("Authentication required");
       }
 
       return userQuery.searchByCode(accessToken, searchResult);
     },
+    enabled: isFetch && Boolean(accessToken) && Boolean(searchResult),
   });
 
-  const searchUser = async (searchResult: string) => {
-    if (
-      typeof searchResult !== "string" ||
-      searchResult === "" ||
-      !accessToken
-    ) {
+  const searchUser = async (searchCode: string) => {
+    if (searchCode === "" || !accessToken) {
       return;
     }
 
-    await mutation.mutateAsync(searchResult).catch(() => undefined);
-    setHasSearch(true);
+    if (searchCode === searchResult) {
+      await query.refetch();
+      return;
+    }
+
+    setSearchResult(searchCode);
+    if (!isFetch) {
+      setIsFetch(true);
+    }
   };
 
   return {
-    data: mutation.data ?? null,
-    error: mutation.error
-      ? mutation.error instanceof Error
-        ? mutation.error.message
-        : "Unknown error"
-      : null,
-    loading: mutation.isPending,
-    hasSearch,
+    data: accessToken ? (query.data ?? null) : null,
+    error:
+      accessToken && query.error
+        ? query.error instanceof Error
+          ? query.error.message
+          : "Unknown error"
+        : null,
+    loading: accessToken ? query.isFetching : false,
+    hasSearch: isFetch && query.isFetched,
     searchUser,
   };
 };

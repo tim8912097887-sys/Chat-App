@@ -31,6 +31,7 @@ describe('refresh', () => {
           id: expect.any(String),
           name: 'Test User',
           imageUrl: null,
+          searchCode: expect.any(String),
         },
       });
       expect(userRecord[0]?.tokenVersion).toBe(0);
@@ -109,6 +110,7 @@ describe('refresh', () => {
           id: expect.any(String),
           name: 'Test User',
           imageUrl: null,
+          searchCode: expect.any(String),
         },
       });
       expect(secondRes.status).toBe(401);
@@ -158,6 +160,7 @@ describe('refresh', () => {
           id: expect.any(String),
           name: 'Test User',
           imageUrl: null,
+          searchCode: expect.any(String),
         },
       });
       expect(second.status).toBe(401);

@@ -45,13 +45,13 @@ const createFriendRequest = async (
 
 const acceptFriendRequest = async (
   accessToken: string,
-  requestId: string,
+  requesterId: string,
 ): Promise<FriendRequestActionResponse> => {
   const res = await relationshipClient.post<
     ApiSuccessResponse<FriendRequestActionResponse>
   >(
-    ACCEPT_FRIEND_REQUEST_URL(encodeURIComponent(requestId)),
-    undefined,
+    ACCEPT_FRIEND_REQUEST_URL,
+    { requesterId },
     authConfig(accessToken),
   );
   return res.data.data;
@@ -59,13 +59,13 @@ const acceptFriendRequest = async (
 
 const rejectFriendRequest = async (
   accessToken: string,
-  requestId: string,
+  requesterId: string,
 ): Promise<FriendRequestActionResponse> => {
   const res = await relationshipClient.post<
     ApiSuccessResponse<FriendRequestActionResponse>
   >(
-    REJECT_FRIEND_REQUEST_URL(encodeURIComponent(requestId)),
-    undefined,
+    REJECT_FRIEND_REQUEST_URL,
+    { requesterId },
     authConfig(accessToken),
   );
   return res.data.data;

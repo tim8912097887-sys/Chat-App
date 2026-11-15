@@ -16,10 +16,10 @@ export const createFriendRequestSchema = z.object({
   targetUserId: z.uuid('targetUserId must be a valid user id'),
 });
 
-export const friendRequestPathParamsSchema = z.object({
-  requestId: z.uuid('requestId must be a valid friend request id'),
+export const updateFriendRequestSchema = z.object({
+  requesterId: z.uuid('requesterId must be a valid user id'),
 });
 
 export type FriendRequestQuery = z.infer<typeof friendRequestQuerySchema>;
 export type CreateFriendRequestBody = z.infer<typeof createFriendRequestSchema>;
-export type FriendRequestPathParams = z.infer<typeof friendRequestPathParamsSchema>;
+export type UpdateFriendRequestBody = z.infer<typeof updateFriendRequestSchema>;

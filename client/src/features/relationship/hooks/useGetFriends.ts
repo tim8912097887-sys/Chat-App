@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
+import { readQueryRetry } from "../../../common/query/retry";
 import { userQuery } from "../../user/api/query/query";
 import { FRIEND_SEARCH_LIMIT } from "../constants/constants";
 import { getFriendsKey } from "../utils/key";
@@ -8,6 +9,7 @@ const useGetFriends = (searchString = "") => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const query = useQuery({
+    ...readQueryRetry,
     queryKey: getFriendsKey(userId, searchString),
     queryFn: () => {
       if (!accessToken) {

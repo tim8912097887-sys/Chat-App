@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { isDuplicateKeyError } from '../../shared/utils/error.js';
 import { FriendshipAlreadyExistError } from './error/friendship-already-exist.js';
 import { FriendshipDocument, FriendshipModel } from './friendships.model.js';
@@ -9,24 +10,35 @@ export interface RelationshipRepository {
     userId: string,
     pagination: FriendRequestPagination,
   ): Promise<FriendshipDocument[]>;
-  findByUsers(pairKey: string): Promise<FriendshipDocument | null>;
-  findPendingRequestById(requestId: string): Promise<FriendshipDocument | null>;
-  createFriendRequest(
+  findByUsers(userId: string, otherUserId: string): Promise<FriendshipDocument | null>;
+  findPendingRequestByUsers(requesterId: string, recipientId: string): Promise<FriendshipDocument | null>;
+  createFriendRequest(requesterId: string, recipientId: string): Promise<FriendshipDocument>;
+  reopenRejectedRequest(
+    requestId: string,
     requesterId: string,
     recipientId: string,
-    pairKey: string,
-  ): Promise<FriendshipDocument>;
-  reopenRejectedRequest(requestId: string, requesterId: string): Promise<FriendshipDocument | null>;
+  ): Promise<FriendshipDocument | null>;
   updatePendingRequestStatus(requestId: string, status: 'ACCEPTED' | 'REJECTED'): Promise<boolean>;
 }
+
+const createFriendshipId = (userId: string, otherUserId: string): string => {
+  const hash = createHash('sha1')
+    .update([userId, otherUserId].sort().join(':'))
+    .digest()
+    .subarray(0, 16);
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  const hex = hash.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 
 export class MongoRelationshipRepository implements RelationshipRepository {
   constructor(private readonly friendshipModel: FriendshipModel) {}
 
   async findFriendsByUserId(id: string): Promise<FriendshipDocument[]> {
     return this.friendshipModel
-      .find({ userIds: id, status: 'ACCEPTED' })
-      .select({ userIds: 1 })
+      .find({ $or: [{ requestedBy: id }, { recipient: id }], status: 'ACCEPTED' })
+      .select({ requestedBy: 1, recipient: 1 })
       .sort({ updatedAt: -1, _id: 1 })
       .exec();
   }
@@ -37,8 +49,8 @@ export class MongoRelationshipRepository implements RelationshipRepository {
   ): Promise<FriendshipDocument[]> {
     const filter =
       pagination.direction === 'incoming'
-        ? { userIds: userId, requestedBy: { $ne: userId }, status: 'PENDING' as const }
-        : { userIds: userId, requestedBy: userId, status: 'PENDING' as const };
+        ? { recipient: userId, status: 'PENDING' as const }
+        : { requestedBy: userId, status: 'PENDING' as const };
 
     return this.friendshipModel
       .find(filter)
@@ -48,25 +60,36 @@ export class MongoRelationshipRepository implements RelationshipRepository {
       .exec();
   }
 
-  async findByUsers(pairKey: string): Promise<FriendshipDocument | null> {
-    return this.friendshipModel.findOne({ pairKey }).exec();
+  async findByUsers(userId: string, otherUserId: string): Promise<FriendshipDocument | null> {
+    return this.friendshipModel
+      .findOne({
+        $or: [
+          { requestedBy: userId, recipient: otherUserId },
+          { requestedBy: otherUserId, recipient: userId },
+        ],
+      })
+      .exec();
   }
 
-  async findPendingRequestById(requestId: string): Promise<FriendshipDocument | null> {
-    return this.friendshipModel.findOne({ _id: requestId, status: 'PENDING' }).exec();
+  async findPendingRequestByUsers(
+    requesterId: string,
+    recipientId: string,
+  ): Promise<FriendshipDocument | null> {
+    return this.friendshipModel
+      .findOne({ requestedBy: requesterId, recipient: recipientId, status: 'PENDING' })
+      .exec();
   }
 
   async createFriendRequest(
     requesterId: string,
     recipientId: string,
-    pairKey: string,
   ): Promise<FriendshipDocument> {
     try {
       const friendship = await this.friendshipModel.create({
-        userIds: [requesterId, recipientId],
+        _id: createFriendshipId(requesterId, recipientId),
         requestedBy: requesterId,
+        recipient: recipientId,
         status: 'PENDING',
-        pairKey,
       });
 
       return friendship;
@@ -81,11 +104,12 @@ export class MongoRelationshipRepository implements RelationshipRepository {
   async reopenRejectedRequest(
     requestId: string,
     requesterId: string,
+    recipientId: string,
   ): Promise<FriendshipDocument | null> {
     const result = await this.friendshipModel
       .findOneAndUpdate(
         { _id: requestId, status: 'REJECTED' },
-        { $set: { requestedBy: requesterId, status: 'PENDING' } },
+        { $set: { requestedBy: requesterId, recipient: recipientId, status: 'PENDING' } },
         { new: true }, // Returns the updated document
       )
       .exec();

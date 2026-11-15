@@ -17,17 +17,19 @@ export async function inviteFriend(accessToken: string, targetId: string) {
   return response;
 }
 
-export async function rejectRelationship(accessToken: string, requestId: string) {
+export async function rejectRelationship(accessToken: string, requesterId: string) {
   const response = await api()
-    .post(rejectRelationshipUrl(requestId))
-    .set('Authorization', `Bearer ${accessToken}`);
+    .post(rejectRelationshipUrl)
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({ requesterId });
   return response;
 }
 
-export async function acceptRelationship(accessToken: string, requestId: string) {
+export async function acceptRelationship(accessToken: string, requesterId: string) {
   const response = await api()
-    .post(acceptRelationshipUrl(requestId))
-    .set('Authorization', `Bearer ${accessToken}`);
+    .post(acceptRelationshipUrl)
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({ requesterId });
   return response;
 }
 
@@ -45,7 +47,8 @@ export async function createPendingRequest() {
 
   await inviteFriend(requesterAccessToken, recipient!._id.toString());
   const relationship = await friendshipModel.findOne({
-    userIds: { $all: [requester!._id.toString(), recipient!._id.toString()], $size: 2 },
+    requestedBy: requester!._id.toString(),
+    recipient: recipient!._id.toString(),
   });
   expect(relationship?.status).toBe('PENDING');
 

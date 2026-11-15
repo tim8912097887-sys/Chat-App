@@ -10,10 +10,13 @@ import type {
   PublicUser,
   User,
   UserIdentity,
+  UserProfile,
   UserSearchRecord,
 } from './user.types.js';
 import { generateSearchCode } from './user.utils.js';
 import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
+import type { RelationshipState } from '../relationship/relationship.constants.js';
+import { RELATIONSHIP_STATE } from '../relationship/relationship.constants.js';
 
 export class UserService {
   constructor(
@@ -34,13 +37,43 @@ export class UserService {
     return this.toUserDomain(user);
   }
 
+  async getProfile(identity: UserIdentity): Promise<UserProfile> {
+    const user = await this.getActiveUser(identity);
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      imageUrl: user.imageUrl,
+      searchCode: user.searchCode,
+    };
+  }
+
   async searchActiveBySearchCode(
     identity: UserIdentity,
     searchCode: string,
-  ): Promise<PublicUser | null> {
+  ): Promise<{ user: PublicUser; state: RelationshipState } | null> {
     await this.validateUserIdentity(identity);
     const user = await this.userRepository.findActiveBySearchCode(searchCode);
-    return user ? this.toPublicUser(user) : null;
+    if (!user) return null;
+
+    let state: RelationshipState = RELATIONSHIP_STATE.NONE;
+    if (identity.userId === user._id) {
+      state = RELATIONSHIP_STATE.SELF;
+    } else {
+      const relationship = await this.relationshipRepository.findByUsers(identity.userId, user._id);
+      if (relationship?.status === 'ACCEPTED') {
+        state = RELATIONSHIP_STATE.FRIEND;
+      } else if (relationship?.status === 'PENDING') {
+        state =
+          relationship.requestedBy === identity.userId
+            ? RELATIONSHIP_STATE.INVITE
+            : RELATIONSHIP_STATE.RECIPIENT;
+      }
+    }
+    return {
+      user: this.toPublicUser(user),
+      state,
+    };
   }
 
   async searchFriendsByName(
@@ -51,8 +84,11 @@ export class UserService {
 
     const relationships = await this.relationshipRepository.findFriendsByUserId(identity.userId);
     const friendsId = relationships
-      .map((relationship) => relationship.userIds.find((id) => id !== identity.userId))
-      .filter((id): id is string => id !== undefined);
+      .map((relationship) =>
+        relationship.requestedBy === identity.userId
+          ? relationship.recipient
+          : relationship.requestedBy,
+      );
 
     if (friendsId.length === 0) return [];
     const users = await this.userRepository.searchFriendByName(friendsId, {
@@ -120,10 +156,15 @@ export class UserService {
   }
 
   private async validateUserIdentity(identity: UserIdentity): Promise<void> {
+    await this.getActiveUser(identity);
+  }
+
+  private async getActiveUser(identity: UserIdentity): Promise<User> {
     const user = await this.userRepository.findById(identity.userId);
     if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== identity.tokenVersion) {
       throw new InvalidUserTokenError('Invalid user token');
     }
+    return this.toUserDomain(user);
   }
 
   private toPublicUser(user: UserSearchRecord): PublicUser {

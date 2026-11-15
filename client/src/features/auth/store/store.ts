@@ -1,14 +1,14 @@
 import { create } from "zustand";
-import type { PublicUser } from "../../user/types";
+import type { AuthenticatedUser } from "../../user/types";
 
 type AuthStatus = "checking" | "authenticated" | "unauthenticated" | "error";
 
 interface AuthState {
   accessToken: string | null;
-  user: PublicUser | null;
+  user: AuthenticatedUser | null;
   status: AuthStatus;
 
-  setSession: (session: { accessToken: string; user: PublicUser }) => void;
+  setSession: (session: { accessToken: string; user: AuthenticatedUser }) => void;
 
   clearAuth: () => void;
   setStatus: (status: AuthStatus) => void;

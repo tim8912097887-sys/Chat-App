@@ -1,4 +1,4 @@
-import { PublicUser } from '../../user/user.types.js';
+import { AuthenticatedUser } from '../../user/user.types.js';
 
 export interface AuthTokens {
   accessToken: string;
@@ -7,5 +7,5 @@ export interface AuthTokens {
 
 export interface AuthDto {
   tokens: AuthTokens;
-  user: PublicUser;
+  user: AuthenticatedUser;
 }

@@ -13,9 +13,12 @@ describe("Search user", () => {
         http.get(`${userBasedUrl}/search`, () =>
           HttpResponse.json(
             successResponse({
-              id: "found-user-id",
-              name: "found-user",
-              imageUrl: null,
+              user: {
+                id: "found-user-id",
+                name: "found-user",
+                imageUrl: null,
+              },
+              state: "none",
             }),
           ),
         ),
@@ -35,6 +38,76 @@ describe("Search user", () => {
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
+
+    it.each([
+      ["self", "This is you"],
+      ["invite", "Request sent"],
+      ["friend", "Already friends"],
+    ] as const)(
+      "when relationship state is %s should display its related text",
+      async (state, relatedText) => {
+        server.use(
+          http.get(`${userBasedUrl}/search`, () =>
+            HttpResponse.json(
+              successResponse({
+                user: {
+                  id: "found-user-id",
+                  name: "found-user",
+                  imageUrl: null,
+                },
+                state,
+              }),
+            ),
+          ),
+        );
+        const { user } = renderAuthenticatedApp();
+
+        await user.type(
+          screen.getByRole("textbox", { name: /8-character search code/i }),
+          "A7BC2DEF",
+        );
+        await user.click(screen.getByRole("button", { name: /Find user/i }));
+
+        expect(await screen.findByText(relatedText)).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: /Send Request/i }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: /Accept/i }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it.each([["accept"], ["reject"]] as const)(
+      "when relationship state is recipient should allow the user to %s",
+      async (action) => {
+        server.use(
+          http.get(`${userBasedUrl}/search`, () =>
+            HttpResponse.json(
+              successResponse({
+                user: {
+                  id: "requester-id",
+                  name: "requester",
+                  imageUrl: null,
+                },
+                state: "recipient",
+              }),
+            ),
+          ),
+        );
+        const { user } = renderAuthenticatedApp();
+
+        await user.type(
+          screen.getByRole("textbox", { name: /8-character search code/i }),
+          "A7BC2DEF",
+        );
+        await user.click(screen.getByRole("button", { name: /Find user/i }));
+
+        expect(
+          await screen.findByRole("button", { name: new RegExp(action, "i") }),
+        ).toBeInTheDocument();
+      },
+    );
   });
 
   describe("Empty Search", () => {

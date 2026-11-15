@@ -2,13 +2,12 @@ import { Router } from 'express';
 import type { RequestHandler } from 'express';
 import {
   validateBody,
-  validatePathParams,
   validateQueryParams,
 } from '../../infrastructure/http/middleware/validate.js';
 import {
   createFriendRequestSchema,
-  friendRequestPathParamsSchema,
   friendRequestQuerySchema,
+  updateFriendRequestSchema,
 } from './dto/friend-request.js';
 import type { RelationshipController } from './relationship.controller.js';
 
@@ -32,15 +31,15 @@ export const createRelationshipRouter = (deps: {
     controller.createFriendRequest,
   );
   router.post(
-    '/:requestId/accept',
+    '/accept',
     accessTokenMiddleware,
-    validatePathParams(friendRequestPathParamsSchema),
+    validateBody(updateFriendRequestSchema),
     controller.acceptFriendRequest,
   );
   router.post(
-    '/:requestId/reject',
+    '/reject',
     accessTokenMiddleware,
-    validatePathParams(friendRequestPathParamsSchema),
+    validateBody(updateFriendRequestSchema),
     controller.rejectFriendRequest,
   );
 

@@ -8,7 +8,12 @@ import { customRender } from "../common/render";
 export const renderAuthenticatedApp = () => {
   useAuthStore.setState({
     accessToken: "test-access-token",
-    user: { id: "test-user-id", name: "Test User", imageUrl: null },
+    user: {
+      id: "test-user-id",
+      name: "Test User",
+      imageUrl: null,
+      searchCode: "TEST1234",
+    },
     status: "authenticated",
   });
 
