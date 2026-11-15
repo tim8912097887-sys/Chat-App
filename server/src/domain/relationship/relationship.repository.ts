@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { isDuplicateKeyError } from '../../shared/utils/error.js';
 import { FriendshipAlreadyExistError } from './error/friendship-already-exist.js';
 import { FriendshipDocument, FriendshipModel } from './friendships.model.js';
@@ -11,7 +11,10 @@ export interface RelationshipRepository {
     pagination: FriendRequestPagination,
   ): Promise<FriendshipDocument[]>;
   findByUsers(userId: string, otherUserId: string): Promise<FriendshipDocument | null>;
-  findPendingRequestByUsers(requesterId: string, recipientId: string): Promise<FriendshipDocument | null>;
+  findPendingRequestByUsers(
+    requesterId: string,
+    recipientId: string,
+  ): Promise<FriendshipDocument | null>;
   createFriendRequest(requesterId: string, recipientId: string): Promise<FriendshipDocument>;
   reopenRejectedRequest(
     requestId: string,
@@ -20,17 +23,6 @@ export interface RelationshipRepository {
   ): Promise<FriendshipDocument | null>;
   updatePendingRequestStatus(requestId: string, status: 'ACCEPTED' | 'REJECTED'): Promise<boolean>;
 }
-
-const createFriendshipId = (userId: string, otherUserId: string): string => {
-  const hash = createHash('sha1')
-    .update([userId, otherUserId].sort().join(':'))
-    .digest()
-    .subarray(0, 16);
-  hash[6] = (hash[6] & 0x0f) | 0x50;
-  hash[8] = (hash[8] & 0x3f) | 0x80;
-  const hex = hash.toString('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-};
 
 export class MongoRelationshipRepository implements RelationshipRepository {
   constructor(private readonly friendshipModel: FriendshipModel) {}
@@ -80,13 +72,10 @@ export class MongoRelationshipRepository implements RelationshipRepository {
       .exec();
   }
 
-  async createFriendRequest(
-    requesterId: string,
-    recipientId: string,
-  ): Promise<FriendshipDocument> {
+  async createFriendRequest(requesterId: string, recipientId: string): Promise<FriendshipDocument> {
     try {
       const friendship = await this.friendshipModel.create({
-        _id: createFriendshipId(requesterId, recipientId),
+        _id: randomUUID(),
         requestedBy: requesterId,
         recipient: recipientId,
         status: 'PENDING',
