@@ -101,9 +101,12 @@ export class RelationshipService {
       throw new FriendshipAlreadyExistError('A friend request or friendship already exists');
     }
 
+    const pairKey = [identity.userId, input.targetUserId].sort().join(':');
+
     const friendRequest = await this.relationshipRepository.createFriendRequest(
       identity.userId,
       input.targetUserId,
+      pairKey,
     );
 
     this.realtimeEvents.publishToUser(

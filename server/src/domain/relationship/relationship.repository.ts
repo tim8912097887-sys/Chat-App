@@ -15,7 +15,11 @@ export interface RelationshipRepository {
     requesterId: string,
     recipientId: string,
   ): Promise<FriendshipDocument | null>;
-  createFriendRequest(requesterId: string, recipientId: string): Promise<FriendshipDocument>;
+  createFriendRequest(
+    requesterId: string,
+    recipientId: string,
+    pairKey: string,
+  ): Promise<FriendshipDocument>;
   reopenRejectedRequest(
     requestId: string,
     requesterId: string,
@@ -72,13 +76,18 @@ export class MongoRelationshipRepository implements RelationshipRepository {
       .exec();
   }
 
-  async createFriendRequest(requesterId: string, recipientId: string): Promise<FriendshipDocument> {
+  async createFriendRequest(
+    requesterId: string,
+    recipientId: string,
+    pairKey: string,
+  ): Promise<FriendshipDocument> {
     try {
       const friendship = await this.friendshipModel.create({
         _id: randomUUID(),
         requestedBy: requesterId,
         recipient: recipientId,
         status: 'PENDING',
+        pairKey,
       });
 
       return friendship;

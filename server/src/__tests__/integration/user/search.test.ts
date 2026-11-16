@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../utils/common/app.js';
 import { LOGOUT_ALL_URL, SIGNUP_URL } from '../../utils/auth/constants.js';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
+import { createFriendship } from '../../utils/relationship/query.js';
 import {
   expectAuthError,
   expectServerError,
@@ -102,11 +103,7 @@ describe('user search', () => {
         .select({ searchCode: 1 });
       expect(requester).not.toBeNull();
       expect(recipient).not.toBeNull();
-      await friendshipModel.create({
-        requestedBy: requester!._id.toString(),
-        recipient: recipient!._id.toString(),
-        status: 'PENDING',
-      });
+      await createFriendship(requester!._id.toString(), recipient!._id.toString(), 'PENDING');
 
       const response = await searchUserRequest(accessToken).query({ q: recipient!.searchCode });
 
@@ -122,11 +119,7 @@ describe('user search', () => {
         .select({ searchCode: 1 });
       expect(recipient).not.toBeNull();
       expect(requester).not.toBeNull();
-      await friendshipModel.create({
-        requestedBy: requester!._id.toString(),
-        recipient: recipient!._id.toString(),
-        status: 'PENDING',
-      });
+      await createFriendship(requester!._id.toString(), recipient!._id.toString(), 'PENDING');
 
       const response = await searchUserRequest(accessToken).query({ q: requester!.searchCode });
 
@@ -140,11 +133,7 @@ describe('user search', () => {
       const friend = await userModel.findOne({ email: friendEmail }).select({ searchCode: 1 });
       expect(requester).not.toBeNull();
       expect(friend).not.toBeNull();
-      await friendshipModel.create({
-        requestedBy: requester!._id.toString(),
-        recipient: friend!._id.toString(),
-        status: 'ACCEPTED',
-      });
+      await createFriendship(requester!._id.toString(), friend!._id.toString(), 'ACCEPTED');
 
       const response = await searchUserRequest(accessToken).query({ q: friend!.searchCode });
 
@@ -160,15 +149,13 @@ describe('user search', () => {
         const otherUser = await userModel.findOne({ email: otherEmail }).select({ searchCode: 1 });
         expect(currentUser).not.toBeNull();
         expect(otherUser).not.toBeNull();
-        await friendshipModel.create({
-          requestedBy: currentUserIsRequester
-            ? currentUser!._id.toString()
-            : otherUser!._id.toString(),
-          recipient: currentUserIsRequester
-            ? otherUser!._id.toString()
-            : currentUser!._id.toString(),
-          status: 'REJECTED',
-        });
+        const requestedBy = currentUserIsRequester
+          ? currentUser!._id.toString()
+          : otherUser!._id.toString();
+        const recipient = currentUserIsRequester
+          ? otherUser!._id.toString()
+          : currentUser!._id.toString();
+        await createFriendship(requestedBy, recipient, 'REJECTED');
 
         const response = await searchUserRequest(accessToken).query({ q: otherUser!.searchCode });
 

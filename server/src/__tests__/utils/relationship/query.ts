@@ -64,6 +64,21 @@ export async function createPendingRequest() {
   };
 }
 
+export function createFriendship(
+  requestedBy: string,
+  recipient: string,
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED',
+  createdAt?: Date,
+) {
+  return friendshipModel.create({
+    requestedBy,
+    recipient,
+    status,
+    pairKey: [requestedBy, recipient].sort().join(':'),
+    ...(createdAt ? { createdAt } : {}),
+  });
+}
+
 export function friendRequestsRequest(accessToken?: string) {
   const request = api().get(RELATIONSHIP_URL);
   if (accessToken) request.set('Authorization', `Bearer ${accessToken}`);
