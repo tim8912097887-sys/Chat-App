@@ -10,6 +10,7 @@ export const createUserRouter = (deps: {
   const { controller, accessTokenMiddleware } = deps;
   const router = Router();
 
+  router.get('/profile', accessTokenMiddleware, controller.profile);
   router.get(
     '/search',
     accessTokenMiddleware,

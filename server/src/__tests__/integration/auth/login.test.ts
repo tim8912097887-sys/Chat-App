@@ -60,8 +60,10 @@ describe('login', () => {
           id: expect.any(String),
           name: input.name,
           imageUrl: null,
+          searchCode: expect.any(String),
         },
       });
+      expect(loginRes.body.data.user.searchCode).toBe(user?.searchCode);
     });
   });
 
@@ -151,6 +153,7 @@ describe('login', () => {
           id: expect.any(String),
           name: input.name,
           imageUrl: null,
+          searchCode: expect.any(String),
         },
       });
       const user = await userRepository.findByEmail(input.email);

@@ -63,7 +63,7 @@ export class PresenceService {
     const friendIds = [
       ...new Set(
         friendships.flatMap((friendship) =>
-          friendship.userIds.filter((id) => id.toString() !== userId),
+          [friendship.requestedBy, friendship.recipient].filter((id) => id !== userId),
         ),
       ),
     ];

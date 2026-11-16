@@ -23,6 +23,7 @@ export const loginResponse = (): LoginResponse => {
       id: "test-id",
       name: "test-name",
       imageUrl: null,
+      searchCode: "TEST1234",
     },
   };
 };

@@ -5,6 +5,9 @@ import RetrySection from "../../../../../common/components/retry/RetrySection";
 import { Button } from "../../../../../common/components/button";
 import UserNotFoundSection from "./UserNotFoundSection";
 import useAddFriend from "../../../hooks/useAddFriend";
+import { RELATIONSHIP_STATE } from "../../../../user/constants/constants";
+import type { RelationshipState } from "../../../../user/types";
+import { useFriendActions } from "../../../hooks/useFriendActions";
 
 const AddFriendSection = () => {
   const [code, setCode] = useState("");
@@ -16,6 +19,13 @@ const AddFriendSection = () => {
     hasSearch,
   } = useSearchUser();
   const { loading: addLoading, addFriend } = useAddFriend();
+  const {
+    handleAcceptFriend,
+    handleRejectFriend,
+    isResponding,
+    acceptLoading,
+    rejectLoading,
+  } = useFriendActions();
 
   const handleSearch = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,6 +34,69 @@ const AddFriendSection = () => {
 
   const handleAddFriend = async (targetUserId: string) => {
     await addFriend(targetUserId);
+  };
+
+  const renderRelationshipAction = (
+    state: RelationshipState,
+    targetUserId: string,
+  ) => {
+    switch (state) {
+      case RELATIONSHIP_STATE.NONE:
+        return (
+          <Button
+            type="button"
+            loading={addLoading}
+            disabled={addLoading}
+            size="sm"
+            onClick={() => handleAddFriend(targetUserId)}
+          >
+            Send Request
+          </Button>
+        );
+      case RELATIONSHIP_STATE.RECIPIENT:
+        return (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              loading={acceptLoading}
+              disabled={isResponding}
+              size="sm"
+              onClick={() => handleAcceptFriend(targetUserId)}
+            >
+              Accept
+            </Button>
+            <Button
+              type="button"
+              loading={rejectLoading}
+              disabled={isResponding}
+              onClick={() => handleRejectFriend(targetUserId)}
+              size="sm"
+            >
+              Reject
+            </Button>
+          </div>
+        );
+      case RELATIONSHIP_STATE.SELF:
+        return (
+          <span className="shrink-0 px-3 py-1 text-xs font-medium rounded-full bg-slate-200/70 text-slate-600">
+            This is you
+          </span>
+        );
+      case RELATIONSHIP_STATE.FRIEND:
+        return (
+          <span className="shrink-0 px-3 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/70">
+            Already friends
+          </span>
+        );
+      case RELATIONSHIP_STATE.INVITE:
+        return (
+          <span className="shrink-0 px-3 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200/70">
+            Request sent
+          </span>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -82,26 +155,18 @@ const AddFriendSection = () => {
         <div className="mt-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 flex items-center justify-between gap-3 animate-in fade-in duration-200">
           <div className="flex items-center gap-3 min-w-0">
             <Avatar
-              imageUrl={data.imageUrl}
+              imageUrl={data.user.imageUrl}
               size="w-10 h-10"
               bgColor="bg-emerald-50"
               textColor="text-emerald-600"
             />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-800 truncate">
-                {data.name}
+                {data.user.name}
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            loading={addLoading}
-            disabled={addLoading}
-            size="sm"
-            onClick={() => handleAddFriend(data.id)}
-          >
-            Send Request
-          </Button>
+          {renderRelationshipAction(data.state, data.user.id)}
         </div>
       )}
     </div>

@@ -35,6 +35,14 @@ export interface PublicUser {
   imageUrl: string | null;
 }
 
+export interface AuthenticatedUser extends PublicUser {
+  searchCode: string;
+}
+
+export interface UserProfile extends AuthenticatedUser {
+  email: string;
+}
+
 export interface PaginationOptions {
   name?: string;
   page: number;

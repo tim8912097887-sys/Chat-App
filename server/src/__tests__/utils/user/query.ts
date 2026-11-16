@@ -2,7 +2,7 @@ import { expect } from 'vitest';
 import { LOGIN_URL, REFRESH_COOKIE_NAME, SIGNUP_URL } from '../auth/constants.js';
 import { loginUserInput, signupUserInput } from '../auth/factory.js';
 import { api } from '../common/app.js';
-import { FRIEND_SEARCH_URL, USER_SEARCH_URL } from './constants.js';
+import { FRIEND_SEARCH_URL, USER_PROFILE_URL, USER_SEARCH_URL } from './constants.js';
 
 export async function signupAndLogin() {
   const input = signupUserInput({ email: `search-${crypto.randomUUID()}@example.com` });
@@ -51,6 +51,12 @@ export function friendSearchRequest(accessToken?: string) {
 
 export function searchUserRequest(accessToken?: string) {
   const request = api().get(USER_SEARCH_URL);
+  if (accessToken) request.set('Authorization', `Bearer ${accessToken}`);
+  return request;
+}
+
+export function profileRequest(accessToken?: string) {
+  const request = api().get(USER_PROFILE_URL);
   if (accessToken) request.set('Authorization', `Bearer ${accessToken}`);
   return request;
 }

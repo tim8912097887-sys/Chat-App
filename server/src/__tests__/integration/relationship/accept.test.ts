@@ -23,9 +23,10 @@ describe('accept relationship', () => {
 
   describe('success', () => {
     it('when the recipient accepts a pending request should return 200 and mark it accepted', async () => {
-      const { recipientAccessToken, requestId, recipient } = await createPendingRequest();
+      const { recipientAccessToken, requester, requestId, recipient } =
+        await createPendingRequest();
 
-      const response = await acceptRelationship(recipientAccessToken, requestId);
+      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
       const relationship = await friendshipModel.findById(requestId);
 
       expectSuccessMessageResponse(response, 200, 'Friend request accepted');
@@ -49,8 +50,8 @@ describe('accept relationship', () => {
         await createPendingRequest();
 
       const responses = await Promise.all([
-        acceptRelationship(recipientAccessToken, requestId),
-        acceptRelationship(recipientAccessToken, requestId),
+        acceptRelationship(recipientAccessToken, requester._id.toString()),
+        acceptRelationship(recipientAccessToken, requester._id.toString()),
       ]);
 
       expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
@@ -75,16 +76,21 @@ describe('accept relationship', () => {
 
   describe('validation error', () => {
     it.each([
-      { description: 'a non-UUID requestId', requestId: 'not-a-uuid' },
-      { description: 'a Mongo-style object id', requestId: '507f1f77bcf86cd799439011' },
-    ])('when requestId is $description should return 400', async ({ requestId }) => {
+      { description: 'missing requesterId', body: {} },
+      { description: 'a non-UUID requesterId', body: { requesterId: 'not-a-uuid' } },
+      {
+        description: 'a Mongo-style requesterId',
+        body: { requesterId: '507f1f77bcf86cd799439011' },
+      },
+    ])('when requesterId is $description should return 400', async ({ body }) => {
       const { recipientAccessToken } = await createPendingRequest();
 
       const response = await api()
-        .post(acceptRelationshipUrl(requestId))
-        .set('Authorization', `Bearer ${recipientAccessToken}`);
+        .post(acceptRelationshipUrl)
+        .set('Authorization', `Bearer ${recipientAccessToken}`)
+        .send(body);
 
-      expectValidationError(response, 'requestId');
+      expectValidationError(response, 'requesterId');
       expect((await friendshipModel.findOne({}))?.status).toBe('PENDING');
     });
   });
@@ -109,8 +115,10 @@ describe('accept relationship', () => {
     ])(
       'when accept receives $description should return 401',
       async ({ authorization, expectedDetail }) => {
-        const { requestId } = await createPendingRequest();
-        const request = api().post(acceptRelationshipUrl(requestId));
+        const { requester, requestId } = await createPendingRequest();
+        const request = api()
+          .post(acceptRelationshipUrl)
+          .send({ requesterId: requester._id.toString() });
         if (authorization) request.set('Authorization', authorization);
 
         const response = await request;
@@ -125,7 +133,7 @@ describe('accept relationship', () => {
       { description: 'is inactive', userState: 'inactive' },
       { description: 'has a stale token version', userState: 'stale-token' },
     ])('when the accepting user $description should return 401', async ({ userState }) => {
-      const { recipientAccessToken, recipientEmail, recipientRefreshCookie, requestId } =
+      const { recipientAccessToken, recipientEmail, recipientRefreshCookie, requester, requestId } =
         await createPendingRequest();
 
       if (userState === 'deleted') {
@@ -139,7 +147,7 @@ describe('accept relationship', () => {
         expectSuccessMessageResponse(logoutResponse, 200, 'Logged out all sessions');
       }
 
-      const response = await acceptRelationship(recipientAccessToken, requestId);
+      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
 
       expectAuthError(response, 'Invalid user token');
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
@@ -152,7 +160,7 @@ describe('accept relationship', () => {
       { description: 'has already been accepted', status: 'ACCEPTED' as const },
       { description: 'has already been rejected', status: 'REJECTED' as const },
     ] as const)('when the request $description should return 409', async ({ status }) => {
-      const { recipientAccessToken, requestId } = await createPendingRequest();
+      const { recipientAccessToken, requester, requestId } = await createPendingRequest();
 
       if (status) {
         await friendshipModel.updateOne({ _id: requestId }, { $set: { status } });
@@ -160,7 +168,7 @@ describe('accept relationship', () => {
 
       const response = await acceptRelationship(
         recipientAccessToken,
-        status ? requestId : crypto.randomUUID(),
+        status ? requester._id.toString() : crypto.randomUUID(),
       );
 
       expectServerConflictError(response, 'Friend request is not available to this user');
@@ -169,24 +177,24 @@ describe('accept relationship', () => {
     });
 
     it('when a user outside the relationship tries to accept should return 409', async () => {
-      const { recipient, requestId } = await createPendingRequest();
+      const { recipient, requester, requestId } = await createPendingRequest();
       const { accessToken: otherUserAccessToken } = await signupAndLogin();
       expect(await userModel.countDocuments()).toBe(3);
 
-      const response = await acceptRelationship(otherUserAccessToken, requestId);
+      const response = await acceptRelationship(otherUserAccessToken, requester._id.toString());
 
       expectServerConflictError(response, 'Friend request is not available to this user');
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
-      expect((await friendshipModel.findById(requestId))?.userIds).toContain(
+      expect((await friendshipModel.findById(requestId))?.recipient).toBe(
         recipient._id.toString(),
       );
       expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
 
     it('when the requester tries to accept should return 409 without changing status', async () => {
-      const { requesterAccessToken, requestId } = await createPendingRequest();
+      const { requesterAccessToken, requester, requestId } = await createPendingRequest();
 
-      const response = await acceptRelationship(requesterAccessToken, requestId);
+      const response = await acceptRelationship(requesterAccessToken, requester._id.toString());
 
       expectServerConflictError(response, 'Friend request is not available to this user');
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
@@ -194,13 +202,13 @@ describe('accept relationship', () => {
     });
 
     it('when the pending status update loses a race should return 409 and keep the status unchanged', async () => {
-      const { recipientAccessToken, requestId } = await createPendingRequest();
+      const { recipientAccessToken, requester, requestId } = await createPendingRequest();
       vi.spyOn(
         MongoRelationshipRepository.prototype,
         'updatePendingRequestStatus',
       ).mockResolvedValue(false);
 
-      const response = await acceptRelationship(recipientAccessToken, requestId);
+      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
 
       expectServerConflictError(response, 'Friend request is no longer pending');
       expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
@@ -210,12 +218,12 @@ describe('accept relationship', () => {
 
   describe('server error', () => {
     it('when updating the relationship fails should return 500 and leave it pending', async () => {
-      const { recipientAccessToken, requestId } = await createPendingRequest();
+      const { recipientAccessToken, requester, requestId } = await createPendingRequest();
       const updatePendingRequestStatus = vi
         .spyOn(MongoRelationshipRepository.prototype, 'updatePendingRequestStatus')
         .mockRejectedValue(new Error('database unavailable'));
 
-      const response = await acceptRelationship(recipientAccessToken, requestId);
+      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
 
       expectServerError(response);
       expect(updatePendingRequestStatus).toHaveBeenCalledOnce();

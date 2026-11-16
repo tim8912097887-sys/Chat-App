@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/store/store";
+import { readQueryRetry } from "../../../common/query/retry";
 import { FRIEND_REQUESTS_LIMIT } from "../constants/constants";
 import { relationshipQuery } from "../api/query/query";
 import type { FriendRequestDirection } from "../types";
@@ -15,6 +16,7 @@ const useGetFriendRequest = ({ direction }: UseGetFriendRequestProps) => {
   const userId = useAuthStore((state) => state.user?.id);
   const [page, setPage] = useState(1);
   const query = useQuery({
+    ...readQueryRetry,
     queryKey: getFriendRequestsKey(userId, direction, page),
     queryFn: () => {
       if (!accessToken) {

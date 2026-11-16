@@ -113,6 +113,7 @@ export class AuthService {
         id: user.id,
         name: user.name,
         imageUrl: user.imageUrl,
+        searchCode: user.searchCode,
       },
     };
   }
@@ -158,6 +159,7 @@ export class AuthService {
         id: user.id,
         name: user.name,
         imageUrl: user.imageUrl,
+        searchCode: user.searchCode,
       },
     };
   }

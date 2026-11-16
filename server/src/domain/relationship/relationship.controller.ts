@@ -2,8 +2,8 @@ import type { RequestHandler, Response } from 'express';
 import { successResponse } from '../../shared/http/success.js';
 import type {
   CreateFriendRequestBody,
-  FriendRequestPathParams,
   FriendRequestQuery,
+  UpdateFriendRequestBody,
 } from './dto/friend-request.js';
 import type { RelationshipService } from './relationship.service.js';
 
@@ -29,15 +29,15 @@ export class RelationshipController {
 
   acceptFriendRequest: RequestHandler = async (req, res) => {
     const { userId, tokenVersion } = req.accessToken!;
-    const { requestId } = req.params as FriendRequestPathParams;
-    await this.relationshipService.acceptFriendRequest({ userId, tokenVersion }, requestId);
+    const { requesterId } = req.body as UpdateFriendRequestBody;
+    await this.relationshipService.acceptFriendRequest({ userId, tokenVersion }, requesterId);
     this.sendResponse(res, 200, { message: 'Friend request accepted' });
   };
 
   rejectFriendRequest: RequestHandler = async (req, res) => {
     const { userId, tokenVersion } = req.accessToken!;
-    const { requestId } = req.params as FriendRequestPathParams;
-    await this.relationshipService.rejectFriendRequest({ userId, tokenVersion }, requestId);
+    const { requesterId } = req.body as UpdateFriendRequestBody;
+    await this.relationshipService.rejectFriendRequest({ userId, tokenVersion }, requesterId);
     this.sendResponse(res, 200, { message: 'Friend request rejected' });
   };
 

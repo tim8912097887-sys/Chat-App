@@ -2,6 +2,7 @@ export type FriendRequestDirection = "incoming" | "outgoing";
 
 export type FriendRequestItem = {
   requestId: string;
+  userId: string;
   name: string;
   imageUrl: string | null;
 };

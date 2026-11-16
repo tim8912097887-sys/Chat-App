@@ -63,6 +63,7 @@ describe("Login", () => {
       expect(
         await screen.findByRole("heading", { level: 1, name: /chatter/i }),
       ).toBeInTheDocument();
+      expect(await screen.findByText("TEST1234")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /user account settings menu/i }),
       ).toBeInTheDocument();

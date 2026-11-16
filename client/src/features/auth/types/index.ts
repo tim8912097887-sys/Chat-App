@@ -1,4 +1,4 @@
-import type { PublicUser } from "../../user/types";
+import type { AuthenticatedUser } from "../../user/types";
 
 export type SignupResponse = {
   message: string;
@@ -6,12 +6,12 @@ export type SignupResponse = {
 
 export type LoginResponse = {
   accessToken: string;
-  user: PublicUser;
+  user: AuthenticatedUser;
 };
 
 export type RefreshResponse = {
   accessToken: string;
-  user: PublicUser;
+  user: AuthenticatedUser;
 };
 
 export type LogoutResponse = {

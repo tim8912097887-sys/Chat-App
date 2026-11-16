@@ -1,9 +1,14 @@
 import type { ApiSuccessResponse } from "../../../../common/types/response/response";
-import { FRIEND_SEARCH_URL, USER_SEARCH_URL } from "../../constants/constants";
+import {
+  FRIEND_SEARCH_URL,
+  USER_PROFILE_URL,
+  USER_SEARCH_URL,
+} from "../../constants/constants";
 import type {
   FriendSearchQuery,
   FriendSearchResponse,
   SearchUserResponse,
+  UserProfile,
 } from "../../types";
 import { userClient } from "../client/client";
 
@@ -35,4 +40,15 @@ const searchFriends = async (
   return res.data.data;
 };
 
-export const userQuery = { searchByCode, searchFriends };
+const getProfile = async (accessToken: string): Promise<UserProfile> => {
+  const res = await userClient.get<ApiSuccessResponse<UserProfile>>(
+    USER_PROFILE_URL,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+
+  return res.data.data;
+};
+
+export const userQuery = { searchByCode, searchFriends, getProfile };

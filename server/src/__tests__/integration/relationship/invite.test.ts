@@ -39,8 +39,8 @@ describe('invite friend', () => {
 
       expectSuccessMessageResponse(response, 201, 'Friend request sent');
       expect(friendship).toMatchObject({
-        userIds: [requester!._id.toString(), recipient!._id.toString()],
         requestedBy: requester!._id.toString(),
+        recipient: recipient!._id.toString(),
         status: 'PENDING',
       });
       expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledOnce();
@@ -57,7 +57,7 @@ describe('invite friend', () => {
       );
     });
 
-    it('when invite friend that already been rejected should return 200 with message', async () => {
+    it('when invite friend that already been rejected should return 201 with message', async () => {
       const { accessToken: firstAccessToken } = await signupAndLogin();
       const firstUser = await userModel.findOne({});
       expect(firstUser?.tokenVersion).not.toBeNull();
@@ -67,7 +67,7 @@ describe('invite friend', () => {
       await inviteFriend(secondAccessToken, firstUser?._id.toString() as string);
       const invite = await friendshipModel.findOne({});
       expect(invite?.status).toBe('PENDING');
-      await rejectRelationship(firstAccessToken, invite?._id.toString() as string);
+      await rejectRelationship(firstAccessToken, secondUser?._id.toString() as string);
 
       const response = await inviteFriend(secondAccessToken, firstUser?._id.toString() as string);
       const updatedInvite = await friendshipModel.findOne({});
@@ -122,7 +122,7 @@ describe('invite friend', () => {
       expect(initialResponse.status).toBe(201);
       const initialRequest = await friendshipModel.findOne({});
       expect(initialRequest).not.toBeNull();
-      await rejectRelationship(secondAccessToken, initialRequest!._id.toString());
+      await rejectRelationship(secondAccessToken, firstUser!._id.toString());
 
       const responses = await Promise.all([
         inviteFriend(firstAccessToken, secondUser!._id.toString()),
@@ -265,11 +265,12 @@ describe('invite friend', () => {
       const { accessToken: firstAccessToken } = await signupAndLogin();
       const firstUser = await userModel.findOne({});
       expect(firstUser?.tokenVersion).not.toBeNull();
-      const { accessToken: secondAccessToken } = await signupAndLogin();
+      const { accessToken: secondAccessToken, email: secondUserEmail } = await signupAndLogin();
+      const secondUser = await userModel.findOne({ email: secondUserEmail });
       await inviteFriend(secondAccessToken, firstUser?._id.toString() as string);
       const invite = await friendshipModel.findOne({});
       expect(invite?.status).toBe('PENDING');
-      await acceptRelationship(firstAccessToken, invite?._id.toString() as string);
+      await acceptRelationship(firstAccessToken, secondUser?._id.toString() as string);
 
       const response = await inviteFriend(secondAccessToken, firstUser?._id.toString() as string);
 

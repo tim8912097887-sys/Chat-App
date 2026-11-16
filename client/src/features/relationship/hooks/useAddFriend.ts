@@ -3,6 +3,7 @@ import { useAuthStore } from "../../auth/store/store";
 import { relationshipQuery } from "../api/query/query";
 import { toast } from "react-toastify";
 import { getFriendRequestsKey } from "../utils/key";
+import { getSearchUserKey } from "../../user/utils/key";
 
 const useAddFriend = () => {
   const queryClient = useQueryClient();
@@ -20,6 +21,9 @@ const useAddFriend = () => {
       toast.success(data.message);
       queryClient.invalidateQueries({
         queryKey: getFriendRequestsKey(userId, "outgoing", 1),
+      });
+      queryClient.invalidateQueries({
+        queryKey: getSearchUserKey(userId),
       });
     },
     onError: (error) => {

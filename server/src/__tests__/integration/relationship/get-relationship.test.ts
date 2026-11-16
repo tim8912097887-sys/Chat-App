@@ -11,7 +11,11 @@ import {
 } from '../../utils/common/assertion.js';
 import { api } from '../../utils/common/app.js';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
-import { createPendingRequest, friendRequestsRequest } from '../../utils/relationship/query.js';
+import {
+  createFriendship,
+  createPendingRequest,
+  friendRequestsRequest,
+} from '../../utils/relationship/query.js';
 import { signupAndLogin } from '../../utils/user/query.js';
 
 describe('get relationship requests', () => {
@@ -36,6 +40,7 @@ describe('get relationship requests', () => {
         expectSuccessDataResponse(response, 200, [
           {
             requestId: requestId,
+            userId: otherUser._id.toString(),
             name: otherUser.name,
             imageUrl: null,
           },
@@ -59,12 +64,7 @@ describe('get relationship requests', () => {
       const otherUser = await userModel.findOne({ email: otherEmail });
       expect(otherUser).not.toBeNull();
 
-      await friendshipModel.create({
-        userIds: [recipient._id.toString(), otherUser!._id.toString()],
-        requestedBy: otherUser!._id.toString(),
-        status: 'ACCEPTED',
-        pairKey: [recipient._id.toString(), otherUser!._id.toString()].sort().join(':'),
-      });
+      await createFriendship(otherUser!._id.toString(), recipient._id.toString(), 'ACCEPTED');
 
       const incomingResponse = await friendRequestsRequest(recipientAccessToken).query({
         direction: 'incoming',
@@ -73,6 +73,7 @@ describe('get relationship requests', () => {
       expectSuccessDataResponse(incomingResponse, 200, [
         {
           requestId: expect.any(String),
+          userId: requester._id.toString(),
           name: requester.name,
           imageUrl: null,
         },
@@ -89,13 +90,12 @@ describe('get relationship requests', () => {
         const { email } = await signupAndLogin();
         const requester = await userModel.findOne({ email });
         expect(requester).not.toBeNull();
-        const request = await friendshipModel.create({
-          userIds: [requester!._id.toString(), recipient!._id.toString()],
-          requestedBy: requester!._id.toString(),
-          status: 'PENDING',
-          pairKey: [requester!._id.toString(), recipient!._id.toString()].sort().join(':'),
-          createdAt: new Date(Date.now() + index * 1000),
-        });
+        const request = await createFriendship(
+          requester!._id.toString(),
+          recipient!._id.toString(),
+          'PENDING',
+          new Date(Date.now() + index * 1000),
+        );
         requestIds.push(request._id.toString());
       }
 
@@ -140,6 +140,7 @@ describe('get relationship requests', () => {
       expectSuccessDataResponse(response, 200, [
         {
           requestId: requestId,
+          userId: requester._id.toString(),
           name: requester.name,
           imageUrl: null,
         },
