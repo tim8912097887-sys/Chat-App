@@ -2,7 +2,6 @@ import { MAX_SEARCH_CODE_RETRIES } from './user.constants.js';
 import { UserDocument } from './user.model.js';
 import type { UserRepository } from './user.repository.js';
 import type { RelationshipRepository } from '../relationship/relationship.repository.js';
-import { InvalidUserTokenError } from './error/invalid-user-token.js';
 import type {
   CreateUserInput,
   FailedLoginResult,
@@ -10,7 +9,6 @@ import type {
   PublicUser,
   User,
   UserIdentity,
-  UserProfile,
   UserSearchRecord,
 } from './user.types.js';
 import { generateSearchCode } from './user.utils.js';
@@ -37,22 +35,10 @@ export class UserService {
     return this.toUserDomain(user);
   }
 
-  async getProfile(identity: UserIdentity): Promise<UserProfile> {
-    const user = await this.getActiveUser(identity);
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      imageUrl: user.imageUrl,
-      searchCode: user.searchCode,
-    };
-  }
-
   async searchActiveBySearchCode(
     identity: UserIdentity,
     searchCode: string,
   ): Promise<{ user: PublicUser; state: RelationshipState } | null> {
-    await this.validateUserIdentity(identity);
     const user = await this.userRepository.findActiveBySearchCode(searchCode);
     if (!user) return null;
 
@@ -80,15 +66,12 @@ export class UserService {
     identity: UserIdentity,
     pagination: PaginationOptions,
   ): Promise<(PublicUser & { isOnline: boolean })[]> {
-    await this.validateUserIdentity(identity);
-
     const relationships = await this.relationshipRepository.findFriendsByUserId(identity.userId);
-    const friendsId = relationships
-      .map((relationship) =>
-        relationship.requestedBy === identity.userId
-          ? relationship.recipient
-          : relationship.requestedBy,
-      );
+    const friendsId = relationships.map((relationship) =>
+      relationship.requestedBy === identity.userId
+        ? relationship.recipient
+        : relationship.requestedBy,
+    );
 
     if (friendsId.length === 0) return [];
     const users = await this.userRepository.searchFriendByName(friendsId, {
@@ -153,18 +136,6 @@ export class UserService {
       createdAt: userDocument.createdAt,
       updatedAt: userDocument.updatedAt,
     };
-  }
-
-  private async validateUserIdentity(identity: UserIdentity): Promise<void> {
-    await this.getActiveUser(identity);
-  }
-
-  private async getActiveUser(identity: UserIdentity): Promise<User> {
-    const user = await this.userRepository.findById(identity.userId);
-    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== identity.tokenVersion) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    return this.toUserDomain(user);
   }
 
   private toPublicUser(user: UserSearchRecord): PublicUser {

@@ -1,4 +1,5 @@
-import { RefreshTokenInput, TokenPayload } from '../../domain/auth/util/token-validator.ts';
+import type { RefreshTokenInput, TokenPayload } from '../../domain/auth/util/token-validator.ts';
+import type { UserDocument } from '../../domain/user/user.model.ts';
 
 declare global {
   namespace Express {
@@ -7,6 +8,8 @@ declare global {
       refreshToken?: RefreshTokenInput;
       /** Populated by the access-token middleware. */
       accessToken?: TokenPayload;
+
+      user?: UserDocument;
     }
   }
 }

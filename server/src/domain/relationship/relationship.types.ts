@@ -2,7 +2,6 @@ export type FriendRequestDirection = 'incoming' | 'outgoing';
 
 export interface FriendRequestIdentity {
   userId: string;
-  tokenVersion: number;
 }
 
 export interface FriendRequestPagination {

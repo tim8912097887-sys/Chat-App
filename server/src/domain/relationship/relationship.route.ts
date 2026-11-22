@@ -14,31 +14,36 @@ import type { RelationshipController } from './relationship.controller.js';
 export const createRelationshipRouter = (deps: {
   controller: RelationshipController;
   accessTokenMiddleware: RequestHandler;
+  userValidationMiddleware: RequestHandler;
 }): Router => {
-  const { controller, accessTokenMiddleware } = deps;
+  const { controller, accessTokenMiddleware, userValidationMiddleware } = deps;
   const router = Router();
 
   router.get(
     '/',
     accessTokenMiddleware,
+    userValidationMiddleware,
     validateQueryParams(friendRequestQuerySchema),
     controller.getFriendRequests,
   );
   router.post(
     '/',
     accessTokenMiddleware,
+    userValidationMiddleware,
     validateBody(createFriendRequestSchema),
     controller.createFriendRequest,
   );
   router.post(
     '/accept',
     accessTokenMiddleware,
+    userValidationMiddleware,
     validateBody(updateFriendRequestSchema),
     controller.acceptFriendRequest,
   );
   router.post(
     '/reject',
     accessTokenMiddleware,
+    userValidationMiddleware,
     validateBody(updateFriendRequestSchema),
     controller.rejectFriendRequest,
   );

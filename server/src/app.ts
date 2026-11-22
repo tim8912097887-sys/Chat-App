@@ -37,6 +37,7 @@ export const createApp = (container: AppContainer): Express => {
     createUserRouter({
       controller: container.user.userController,
       accessTokenMiddleware: container.user.accessTokenMiddleware,
+      userValidationMiddleware: container.user.userValidationMiddleware,
     }),
   );
   app.use(
@@ -44,6 +45,7 @@ export const createApp = (container: AppContainer): Express => {
     createRelationshipRouter({
       controller: container.relationship.relationshipController,
       accessTokenMiddleware: container.relationship.accessTokenMiddleware,
+      userValidationMiddleware: container.relationship.userValidationMiddleware,
     }),
   );
 

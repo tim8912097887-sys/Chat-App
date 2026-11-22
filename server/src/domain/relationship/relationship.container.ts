@@ -8,12 +8,14 @@ import { MongoRelationshipRepository } from './relationship.repository.js';
 import type { RelationshipRepository } from './relationship.repository.js';
 import { RelationshipService } from './relationship.service.js';
 import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
+import { createUserValidationMiddleware } from '../../infrastructure/http/middleware/user-validation.js';
 
 export interface RelationshipContainer {
   relationshipRepository: RelationshipRepository;
   relationshipService: RelationshipService;
   relationshipController: RelationshipController;
   accessTokenMiddleware: RequestHandler;
+  userValidationMiddleware: RequestHandler;
 }
 
 export interface RelationshipContainerDeps {
@@ -39,10 +41,15 @@ export const createRelationshipContainer = (
     tokenService: deps.tokenService,
   });
 
+  const userValidationMiddleware = createUserValidationMiddleware({
+    userRepository: deps.userRepository,
+  });
+
   return {
     relationshipRepository,
     relationshipService,
     relationshipController,
     accessTokenMiddleware,
+    userValidationMiddleware,
   };
 };

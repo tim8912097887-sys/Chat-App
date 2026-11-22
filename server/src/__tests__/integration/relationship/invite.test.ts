@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MongoRelationshipRepository } from '../../../domain/relationship/relationship.repository.js';
+import { MongoUserRepository } from '../../../domain/user/user.repository.js';
 import { signupAndLogin } from '../../utils/user/query.js';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
 import { api, mockedRealtimePublisher } from '../../utils/common/app.js';
@@ -33,6 +34,7 @@ describe('invite friend', () => {
       await signupAndLogin();
       const recipient = await userModel.findOne({ _id: { $ne: requester?._id } });
       expect(recipient).not.toBeNull();
+      const findByIdSpy = vi.spyOn(MongoUserRepository.prototype, 'findById');
 
       const response = await inviteFriend(accessToken, recipient!._id.toString());
       const friendship = await friendshipModel.findOne({});
@@ -55,6 +57,7 @@ describe('invite friend', () => {
           },
         }),
       );
+      expect(findByIdSpy).toHaveBeenCalledTimes(2);
     });
 
     it('when invite friend that already been rejected should return 201 with message', async () => {
@@ -224,6 +227,33 @@ describe('invite friend', () => {
   });
 
   describe('business logic error', () => {
+    it.each([
+      { description: 'does not exist', targetState: 'deleted' },
+      { description: 'is inactive', targetState: 'inactive' },
+    ])('when the target user $description should return 409', async ({ targetState }) => {
+      const { accessToken } = await signupAndLogin();
+      let targetId = crypto.randomUUID();
+
+      if (targetState === 'inactive') {
+        const { email } = await signupAndLogin();
+        const target = await userModel.findOne({ email });
+        expect(target).not.toBeNull();
+        await userModel.updateOne({ _id: target!._id }, { $set: { status: 'DISABLED' } });
+        targetId = target!._id.toString();
+      }
+
+      const response = await inviteFriend(accessToken, targetId);
+
+      expectServerConflictError(
+        response,
+        targetState === 'deleted'
+          ? `User ${targetId} is not active`
+          : `User ${targetId} does not exist`,
+      );
+      expect(await friendshipModel.countDocuments()).toBe(0);
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
+    });
+
     it.each([
       { description: 'requester repeats the invite', reciprocal: false },
       { description: 'invited user sends a reciprocal invite', reciprocal: true },
