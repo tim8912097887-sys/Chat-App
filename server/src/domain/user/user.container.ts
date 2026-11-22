@@ -10,6 +10,7 @@ import { registerFriendshipsModel } from '../relationship/friendships.model.js';
 import { MongoRelationshipRepository } from '../relationship/relationship.repository.js';
 import type { RelationshipRepository } from '../relationship/relationship.repository.js';
 import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
+import { createUserValidationMiddleware } from '../../infrastructure/http/middleware/user-validation.js';
 
 export interface UserContainer {
   userRepository: UserRepository;
@@ -17,6 +18,7 @@ export interface UserContainer {
   userService: UserService;
   userController: UserController;
   accessTokenMiddleware: RequestHandler;
+  userValidationMiddleware: RequestHandler;
 }
 
 export interface UserContainerDeps {
@@ -32,11 +34,13 @@ export const createUserContainer = (deps: UserContainerDeps): UserContainer => {
   const userService = new UserService(userRepository, relationshipRepository, realtimeEvents);
   const userController = new UserController(userService);
   const accessTokenMiddleware = createAccessTokenMiddleware({ tokenService });
+  const userValidationMiddleware = createUserValidationMiddleware({ userRepository });
   return {
     userRepository,
     relationshipRepository,
     userService,
     userController,
     accessTokenMiddleware,
+    userValidationMiddleware,
   };
 };

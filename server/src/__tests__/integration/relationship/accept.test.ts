@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MongoRelationshipRepository } from '../../../domain/relationship/relationship.repository.js';
+import { MongoUserRepository } from '../../../domain/user/user.repository.js';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
 import { api, mockedRealtimePublisher } from '../../utils/common/app.js';
 import { signupAndLogin } from '../../utils/user/query.js';
@@ -25,6 +26,7 @@ describe('accept relationship', () => {
     it('when the recipient accepts a pending request should return 200 and mark it accepted', async () => {
       const { recipientAccessToken, requester, requestId, recipient } =
         await createPendingRequest();
+      const findByIdSpy = vi.spyOn(MongoUserRepository.prototype, 'findById');
 
       const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
       const relationship = await friendshipModel.findById(requestId);
@@ -43,6 +45,7 @@ describe('accept relationship', () => {
           },
         }),
       );
+      expect(findByIdSpy).toHaveBeenCalledTimes(1);
     });
 
     it('when the recipient concurrently accepts a request twice should accept it once', async () => {

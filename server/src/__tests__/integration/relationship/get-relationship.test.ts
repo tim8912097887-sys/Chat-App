@@ -34,6 +34,7 @@ describe('get relationship requests', () => {
           await createPendingRequest();
         const accessToken = userRole === 'recipient' ? recipientAccessToken : requesterAccessToken;
         const otherUser = userRole === 'recipient' ? requester : recipient;
+        const findByIdSpy = vi.spyOn(MongoUserRepository.prototype, 'findById');
 
         const response = await friendRequestsRequest(accessToken).query({ direction });
 
@@ -45,6 +46,7 @@ describe('get relationship requests', () => {
             imageUrl: null,
           },
         ]);
+        expect(findByIdSpy).toHaveBeenCalledTimes(1);
       },
     );
 

@@ -11,6 +11,8 @@ import { FriendshipAlreadyExistError } from '../../../domain/relationship/error/
 import { InvalidFriendshipChangeError } from '../../../domain/relationship/error/invalid-friendship-change.js';
 import { SendFriendRequestToSelfError } from '../../../domain/relationship/error/send-friend-request-to-self.js';
 import { InvalidUserTokenError } from '../../../domain/user/error/invalid-user-token.js';
+import { UserNotActiveError } from '../../../domain/user/error/user-not-active.js';
+import { UserNotExistError } from '../../../domain/user/error/user-not-exist.js';
 
 export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefined => {
   if (error instanceof InvalidTokenError) {
@@ -28,6 +30,10 @@ export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefin
   } else if (error instanceof InvalidFriendshipChangeError) {
     return new ServerConflictError(error.message);
   } else if (error instanceof SendFriendRequestToSelfError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof UserNotActiveError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof UserNotExistError) {
     return new ServerConflictError(error.message);
   } else {
     return undefined;

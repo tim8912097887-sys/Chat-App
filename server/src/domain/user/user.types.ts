@@ -51,7 +51,6 @@ export interface PaginationOptions {
 
 export interface UserIdentity {
   userId: string;
-  tokenVersion: number;
 }
 
 export interface CreateUserInput {

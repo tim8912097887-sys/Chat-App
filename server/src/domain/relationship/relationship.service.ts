@@ -1,4 +1,3 @@
-import { InvalidUserTokenError } from '../user/error/invalid-user-token.js';
 import type { UserRepository } from '../user/user.repository.js';
 import type {
   CreateFriendRequestInput,
@@ -20,6 +19,8 @@ import {
   FRIEND_REQUEST_CREATED_EVENT,
   FRIEND_REQUEST_REJECTED_EVENT,
 } from '../../realtime/realtime.constants.js';
+import { UserNotActiveError } from '../user/error/user-not-active.js';
+import { UserNotExistError } from '../user/error/user-not-exist.js';
 
 export class RelationshipService {
   constructor(
@@ -32,7 +33,6 @@ export class RelationshipService {
     identity: FriendRequestIdentity,
     pagination: FriendRequestPagination,
   ): Promise<FriendRequestListItem[]> {
-    await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
     const requests = await this.relationshipRepository.findFriendRequests(
       identity.userId,
       pagination,
@@ -62,25 +62,28 @@ export class RelationshipService {
   }
 
   async createFriendRequest(
-    identity: FriendRequestIdentity,
+    requester: UserDocument,
     input: CreateFriendRequestInput,
   ): Promise<void> {
-    const requester = await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
-    if (identity.userId === input.targetUserId) {
+    const requesterId = requester._id.toString();
+    if (requesterId === input.targetUserId) {
       throw new SendFriendRequestToSelfError('A user cannot send a friend request to themselves');
     }
 
-    await this.getVerifiedActiveUser(input.targetUserId);
+    const targetUser = await this.userRepository.findById(input.targetUserId);
+    if (!targetUser) {
+      throw new UserNotActiveError(input.targetUserId);
+    }
+    if (targetUser.status !== 'ACTIVE') {
+      throw new UserNotExistError(input.targetUserId);
+    }
 
-    const existing = await this.relationshipRepository.findByUsers(
-      identity.userId,
-      input.targetUserId,
-    );
+    const existing = await this.relationshipRepository.findByUsers(requesterId, input.targetUserId);
     if (existing) {
       if (existing.status === 'REJECTED') {
         const reopened = await this.relationshipRepository.reopenRejectedRequest(
           existing._id,
-          identity.userId,
+          requesterId,
           input.targetUserId,
         );
         if (reopened) {
@@ -89,7 +92,7 @@ export class RelationshipService {
             createRealtimeEvent(FRIEND_REQUEST_CREATED_EVENT, {
               requestId: reopened._id.toString(),
               requester: {
-                id: requester._id.toString(),
+                id: requesterId,
                 name: requester.name,
                 imageUrl: requester.imageUrl ?? null,
               },
@@ -101,10 +104,10 @@ export class RelationshipService {
       throw new FriendshipAlreadyExistError('A friend request or friendship already exists');
     }
 
-    const pairKey = [identity.userId, input.targetUserId].sort().join(':');
+    const pairKey = [requesterId, input.targetUserId].sort().join(':');
 
     const friendRequest = await this.relationshipRepository.createFriendRequest(
-      identity.userId,
+      requesterId,
       input.targetUserId,
       pairKey,
     );
@@ -114,7 +117,7 @@ export class RelationshipService {
       createRealtimeEvent(FRIEND_REQUEST_CREATED_EVENT, {
         requestId: friendRequest._id.toString(),
         requester: {
-          id: requester._id.toString(),
+          id: requesterId,
           name: requester.name,
           imageUrl: requester.imageUrl ?? null,
         },
@@ -122,29 +125,28 @@ export class RelationshipService {
     );
   }
 
-  async acceptFriendRequest(identity: FriendRequestIdentity, requesterId: string): Promise<void> {
-    await this.updateRequestStatus(identity, requesterId, 'ACCEPTED');
+  async acceptFriendRequest(responseUser: UserDocument, requesterId: string): Promise<void> {
+    await this.updateRequestStatus(responseUser, requesterId, 'ACCEPTED');
   }
 
-  async rejectFriendRequest(identity: FriendRequestIdentity, requesterId: string): Promise<void> {
-    await this.updateRequestStatus(identity, requesterId, 'REJECTED');
+  async rejectFriendRequest(responseUser: UserDocument, requesterId: string): Promise<void> {
+    await this.updateRequestStatus(responseUser, requesterId, 'REJECTED');
   }
 
   private async updateRequestStatus(
-    identity: FriendRequestIdentity,
+    responseUser: UserDocument,
     requesterId: string,
     status: 'ACCEPTED' | 'REJECTED',
   ): Promise<void> {
-    const user = await this.getVerifiedActiveUser(identity.userId, identity.tokenVersion);
     const request = await this.relationshipRepository.findPendingRequestByUsers(
       requesterId,
-      identity.userId,
+      responseUser._id.toString(),
     );
     if (!request) {
       throw new InvalidFriendshipChangeError('Friend request is not available to this user');
     }
 
-    await this.completeRequestStatusUpdate(user, request, status);
+    await this.completeRequestStatusUpdate(responseUser, request, status);
   }
 
   private async completeRequestStatusUpdate(
@@ -152,7 +154,6 @@ export class RelationshipService {
     request: FriendshipDocument,
     status: 'ACCEPTED' | 'REJECTED',
   ): Promise<void> {
-    await this.getVerifiedActiveUser(request.requestedBy);
     const updated = await this.relationshipRepository.updatePendingRequestStatus(
       request._id,
       status,
@@ -172,16 +173,5 @@ export class RelationshipService {
         },
       }),
     );
-  }
-
-  private async getVerifiedActiveUser(userId: string, tokenVersion?: number) {
-    const user = await this.userRepository.findById(userId);
-    if (!user || user.status !== 'ACTIVE') {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    if (tokenVersion !== undefined && user.tokenVersion !== tokenVersion) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    return user;
   }
 }

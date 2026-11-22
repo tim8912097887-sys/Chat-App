@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MongoRelationshipRepository } from '../../../domain/relationship/relationship.repository.js';
+import { MongoUserRepository } from '../../../domain/user/user.repository.js';
 import { LOGOUT_ALL_URL } from '../../utils/auth/constants.js';
 import {
   expectAuthError,
@@ -25,6 +26,7 @@ describe('reject relationship', () => {
     it('when the recipient rejects a pending request should return 200 and mark it rejected', async () => {
       const { recipientAccessToken, requester, recipient, requestId } =
         await createPendingRequest();
+      const findByIdSpy = vi.spyOn(MongoUserRepository.prototype, 'findById');
 
       const response = await rejectRelationship(recipientAccessToken, requester._id.toString());
       const relationship = await friendshipModel.findById(requestId);
@@ -43,6 +45,7 @@ describe('reject relationship', () => {
           },
         }),
       );
+      expect(findByIdSpy).toHaveBeenCalledTimes(1);
     });
 
     it('when the recipient concurrently rejects a request twice should reject it once', async () => {
