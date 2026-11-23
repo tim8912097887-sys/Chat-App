@@ -1,6 +1,6 @@
 import { type ErrorRequestHandler } from 'express';
-import { ApiError } from '../../../app/error/api.js';
-import { DomainError } from '../../../domain/error/domain.js';
+import { ApiError } from '../../../app/api.js';
+import { DomainError } from '../../../domain/shared/error.js';
 import { mapDomainErrorToApiError } from '../util/error-mapping.js';
 import { logger } from '../../../config/logger/logger.js';
 import { errorResponse } from '../../../shared/http/error.js';

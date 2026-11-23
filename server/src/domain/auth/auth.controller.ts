@@ -2,10 +2,10 @@ import type { CookieOptions, Request, RequestHandler, Response } from 'express';
 import type { AuthService } from './auth.service.js';
 import { SignupInput } from './dto/signup.js';
 import { LoginInput } from './dto/login.js';
-import { successResponse } from '../../shared/http/success.js';
-import { InvalidTokenError } from './error/invalid-token.js';
-import { AuthDto } from './dto/token.js';
+import { InvalidTokenError } from './error/auth.js';
+import { AuthDto, LoginResponseDto } from './dto/common.js';
 import { RefreshCookieOptions } from './auth.types.js';
+import { sendResponse } from '../shared/controller.js';
 
 export class AuthController {
   constructor(
@@ -16,7 +16,7 @@ export class AuthController {
   signup: RequestHandler = async (req, res) => {
     const image = req.file;
     await this.authService.signup(
-      req.body as SignupInput,
+      req.validatedBody as SignupInput,
       image
         ? {
             buffer: image.buffer,
@@ -24,7 +24,7 @@ export class AuthController {
           }
         : undefined,
     );
-    this.sendResponse(res, 201, { message: 'Signed up' });
+    sendResponse(res, 201, { message: 'Signed up' });
   };
 
   login: RequestHandler = async (req, res) => {
@@ -40,7 +40,7 @@ export class AuthController {
   logout: RequestHandler = async (req, res) => {
     await this.authService.logout(this.requireRefreshToken(req));
     this.clearRefreshCookie(res);
-    this.sendResponse(res, 200, { message: 'Logged out' });
+    sendResponse(res, 200, { message: 'Logged out' });
   };
 
   logoutAll: RequestHandler = async (req, res) => {
@@ -50,7 +50,7 @@ export class AuthController {
       tokenVersion: token.tokenVersion,
     });
     this.clearRefreshCookie(res);
-    this.sendResponse(res, 200, { message: 'Logged out all sessions' });
+    sendResponse(res, 200, { message: 'Logged out all sessions' });
   };
 
   private requireRefreshToken(req: Request) {
@@ -64,11 +64,11 @@ export class AuthController {
       ...this.baseCookieOptions(),
       maxAge: this.cookie.maxAgeMs,
     });
-    this.sendResponse(res, 200, { accessToken: authDto.tokens.accessToken, user: authDto.user });
-  }
-
-  private sendResponse<T>(res: Response, status: number, data: T): void {
-    res.status(status).json(successResponse(data));
+    const response: LoginResponseDto = {
+      accessToken: authDto.tokens.accessToken,
+      user: authDto.user,
+    };
+    sendResponse(res, 200, response);
   }
 
   private clearRefreshCookie(res: Response): void {

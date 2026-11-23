@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { z } from 'zod';
-import { BadRequestError } from '../../../app/error/bad-request.js';
+import { BadRequestError } from '../../../app/api.js';
 
 export const validateBody =
   <S extends z.ZodType>(schema: S): RequestHandler =>
@@ -12,7 +12,7 @@ export const validateBody =
         .join('; ');
       throw new BadRequestError(detail);
     }
-    req.body = result.data;
+    req.validatedBody = result.data;
     next();
   };
 
@@ -26,7 +26,7 @@ export const validateQueryParams =
         .join('; ');
       throw new BadRequestError(detail);
     }
-    req.body = result.data;
+    req.validatedQuery = result.data;
     next();
   };
 
@@ -40,5 +40,6 @@ export const validatePathParams =
         .join('; ');
       throw new BadRequestError(detail);
     }
+    req.validatedParams = result.data;
     next();
   };

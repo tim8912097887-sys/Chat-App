@@ -6,6 +6,7 @@ import { shutdown, subscribeShutdown } from './infrastructure/lifecycle/shutdown
 import { createApp } from './app.js';
 import { dbConnection } from './infrastructure/persistence/db.js';
 import { buildContainer } from './container.js';
+// import { migrateLegacyPairKeyIndex } from './domain/conversation/chat-group.model.js';
 import { SocketIoRealtimeEventPublisher } from './realtime/socket-io-realtime-event-publisher.js';
 import { createSocketServer } from './realtime/socket-server.js';
 
@@ -33,6 +34,7 @@ class AppServer {
       await dbConnection();
       const realtimeEvents = new SocketIoRealtimeEventPublisher();
       const container = buildContainer(realtimeEvents);
+      // await migrateLegacyPairKeyIndex();
       const app = createApp(container);
       this.httpServer = createServer(app);
 

@@ -10,6 +10,10 @@ declare global {
       accessToken?: TokenPayload;
 
       user?: UserDocument;
+
+      validatedQuery?: unknown;
+      validatedBody?: unknown;
+      validatedParams?: unknown;
     }
   }
 }

@@ -1,17 +1,15 @@
 import type { UserRepository } from '../user/user.repository.js';
-import type {
-  CreateFriendRequestInput,
-  FriendRequestIdentity,
-  FriendRequestListItem,
-  FriendRequestPagination,
-} from './relationship.types.js';
+import type { FriendRequestIdentity } from './relationship.types.js';
+import type { FriendRequestQuery, FriendRequestResponseDto } from './dto/get-friend-requests.js';
 import type { RelationshipRepository } from './relationship.repository.js';
 import type { PublicUserRecord } from '../user/user.types.js';
 import type { UserDocument } from '../user/user.model.js';
 import type { FriendshipDocument } from './friendships.model.js';
-import { SendFriendRequestToSelfError } from './error/send-friend-request-to-self.js';
-import { FriendshipAlreadyExistError } from './error/friendship-already-exist.js';
-import { InvalidFriendshipChangeError } from './error/invalid-friendship-change.js';
+import {
+  FriendshipAlreadyExistError,
+  InvalidFriendshipChangeError,
+  SendFriendRequestToSelfError,
+} from './error/relationship.js';
 import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
 import { createRealtimeEvent } from '../../realtime/realtime.types.js';
 import {
@@ -19,8 +17,8 @@ import {
   FRIEND_REQUEST_CREATED_EVENT,
   FRIEND_REQUEST_REJECTED_EVENT,
 } from '../../realtime/realtime.constants.js';
-import { UserNotActiveError } from '../user/error/user-not-active.js';
-import { UserNotExistError } from '../user/error/user-not-exist.js';
+import { UserNotActiveError, UserNotExistError } from '../user/error/user.js';
+import { CreateFriendRequestBody } from './dto/create-friend-request.js';
 
 export class RelationshipService {
   constructor(
@@ -31,8 +29,8 @@ export class RelationshipService {
 
   async getFriendRequests(
     identity: FriendRequestIdentity,
-    pagination: FriendRequestPagination,
-  ): Promise<FriendRequestListItem[]> {
+    pagination: FriendRequestQuery,
+  ): Promise<FriendRequestResponseDto[]> {
     const requests = await this.relationshipRepository.findFriendRequests(
       identity.userId,
       pagination,
@@ -63,7 +61,7 @@ export class RelationshipService {
 
   async createFriendRequest(
     requester: UserDocument,
-    input: CreateFriendRequestInput,
+    input: CreateFriendRequestBody,
   ): Promise<void> {
     const requesterId = requester._id.toString();
     if (requesterId === input.targetUserId) {

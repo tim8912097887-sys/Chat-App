@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import { TokenService } from '../../../domain/auth/util/token-validator.js';
-import { InvalidTokenError } from '../../../domain/auth/error/invalid-token.js';
+import { InvalidTokenError } from '../../../domain/auth/error/auth.js';
 
 export const createAccessTokenMiddleware =
   (deps: { tokenService: TokenService }): RequestHandler =>

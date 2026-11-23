@@ -1,6 +1,6 @@
+import { UnauthenticationError } from '../../../app/api.js';
 import { TokenService } from '../../../domain/auth/util/token-validator.js';
 import { UserRepository } from '../../../domain/user/user.repository.js';
-import { UnauthenticationError } from '../../../app/error/unauthentication.js';
 import { AuthenticatedSocket, AuthenticatedSocketData } from '../../../realtime/realtime.types.js';
 
 export function createSocketAuthMiddleware(deps: {

@@ -1,15 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { isDuplicateKeyError } from '../../shared/utils/error.js';
-import { FriendshipAlreadyExistError } from './error/friendship-already-exist.js';
+import { FriendshipAlreadyExistError } from './error/relationship.js';
 import { FriendshipDocument, FriendshipModel } from './friendships.model.js';
-import type { FriendRequestPagination } from './relationship.types.js';
+import { FriendRequestQuery } from './dto/get-friend-requests.js';
 
 export interface RelationshipRepository {
   findFriendsByUserId(id: string): Promise<FriendshipDocument[]>;
-  findFriendRequests(
-    userId: string,
-    pagination: FriendRequestPagination,
-  ): Promise<FriendshipDocument[]>;
+  findFriendRequests(userId: string, pagination: FriendRequestQuery): Promise<FriendshipDocument[]>;
   findByUsers(userId: string, otherUserId: string): Promise<FriendshipDocument | null>;
   findPendingRequestByUsers(
     requesterId: string,
@@ -41,7 +38,7 @@ export class MongoRelationshipRepository implements RelationshipRepository {
 
   async findFriendRequests(
     userId: string,
-    pagination: FriendRequestPagination,
+    pagination: FriendRequestQuery,
   ): Promise<FriendshipDocument[]> {
     const filter =
       pagination.direction === 'incoming'

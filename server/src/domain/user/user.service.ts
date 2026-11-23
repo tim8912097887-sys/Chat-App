@@ -15,6 +15,8 @@ import { generateSearchCode } from './user.utils.js';
 import { RealtimeEventPublisher } from '../../realtime/realtime-event-publisher.js';
 import type { RelationshipState } from '../relationship/relationship.constants.js';
 import { RELATIONSHIP_STATE } from '../relationship/relationship.constants.js';
+import type { SearchUserResponseDto } from './dto/search.js';
+import type { SearchFriendResponseDto } from './dto/search-friends.js';
 
 export class UserService {
   constructor(
@@ -38,7 +40,7 @@ export class UserService {
   async searchActiveBySearchCode(
     identity: UserIdentity,
     searchCode: string,
-  ): Promise<{ user: PublicUser; state: RelationshipState } | null> {
+  ): Promise<SearchUserResponseDto | null> {
     const user = await this.userRepository.findActiveBySearchCode(searchCode);
     if (!user) return null;
 
@@ -65,7 +67,7 @@ export class UserService {
   async searchFriendsByName(
     identity: UserIdentity,
     pagination: PaginationOptions,
-  ): Promise<(PublicUser & { isOnline: boolean })[]> {
+  ): Promise<SearchFriendResponseDto[]> {
     const relationships = await this.relationshipRepository.findFriendsByUserId(identity.userId);
     const friendsId = relationships.map((relationship) =>
       relationship.requestedBy === identity.userId

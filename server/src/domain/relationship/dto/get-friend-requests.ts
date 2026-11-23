@@ -12,14 +12,11 @@ export const friendRequestQuerySchema = z.object({
     .default(20),
 });
 
-export const createFriendRequestSchema = z.object({
-  targetUserId: z.uuid('targetUserId must be a valid user id'),
-});
-
-export const updateFriendRequestSchema = z.object({
-  requesterId: z.uuid('requesterId must be a valid user id'),
-});
-
 export type FriendRequestQuery = z.infer<typeof friendRequestQuerySchema>;
-export type CreateFriendRequestBody = z.infer<typeof createFriendRequestSchema>;
-export type UpdateFriendRequestBody = z.infer<typeof updateFriendRequestSchema>;
+
+export interface FriendRequestResponseDto {
+  requestId: string;
+  userId: string;
+  name: string;
+  imageUrl: string | null;
+}

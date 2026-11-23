@@ -1,55 +1,42 @@
-import type { RequestHandler, Response } from 'express';
-import { successResponse } from '../../shared/http/success.js';
+import type { RequestHandler } from 'express';
 import type { UserService } from './user.service.js';
-import type { FriendSearchQuery, SearchCodeQuery } from './dto/query-params.js';
-import { UserProfile } from './user.types.js';
-import { InvalidUserTokenError } from './error/invalid-user-token.js';
+import type { SearchCodeQuery, SearchUserResponseDto } from './dto/search.js';
+import type { FriendSearchQuery, SearchFriendResponseDto } from './dto/search-friends.js';
+import type { UserProfileDto } from './dto/profile.js';
+import { getAuthUser, sendResponse } from '../shared/controller.js';
 
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   profile: RequestHandler = (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const profile: UserProfile = {
+    const validatedUser = getAuthUser(req);
+    const profile: UserProfileDto = {
       id: validatedUser._id.toString(),
       name: validatedUser.name,
       email: validatedUser.email,
       searchCode: validatedUser.searchCode,
       imageUrl: validatedUser.imageUrl ?? null,
     };
-    this.sendResponse(res, profile);
+    sendResponse(res, 200, profile);
   };
 
   search: RequestHandler = async (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const { q } = req.query as SearchCodeQuery;
-    const user = await this.userService.searchActiveBySearchCode(
+    const validatedUser = getAuthUser(req);
+    const { q } = req.validatedQuery as SearchCodeQuery;
+    const user: SearchUserResponseDto | null = await this.userService.searchActiveBySearchCode(
       { userId: validatedUser._id.toString() },
       q,
     );
-    this.sendResponse(res, user);
+    sendResponse(res, 200, user);
   };
 
   searchFriends: RequestHandler = async (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const { q, page, limit } = req.query as unknown as FriendSearchQuery;
-    const users = await this.userService.searchFriendsByName(
+    const validatedUser = getAuthUser(req);
+    const { q, page, limit } = req.validatedQuery as FriendSearchQuery;
+    const users: SearchFriendResponseDto[] = await this.userService.searchFriendsByName(
       { userId: validatedUser._id.toString() },
       { name: q, page, limit },
     );
-    this.sendResponse(res, users);
+    sendResponse(res, 200, users);
   };
-
-  private sendResponse<T>(res: Response, data: T): void {
-    res.status(200).json(successResponse(data));
-  }
 }
