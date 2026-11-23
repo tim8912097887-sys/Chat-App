@@ -1,60 +1,41 @@
-import type { RequestHandler, Response } from 'express';
-import { successResponse } from '../../shared/http/success.js';
-import type {
-  CreateFriendRequestBody,
-  FriendRequestQuery,
-  UpdateFriendRequestBody,
-} from './dto/friend-request.js';
+import type { RequestHandler } from 'express';
+import type { FriendRequestQuery } from './dto/get-friend-requests.js';
+import type { CreateFriendRequestBody } from './dto/create-friend-request.js';
+import type { UpdateFriendRequestBody } from './dto/update-friend-request.js';
 import type { RelationshipService } from './relationship.service.js';
-import { InvalidUserTokenError } from '../user/error/invalid-user-token.js';
+import { getAuthUser, sendResponse } from '../shared/controller.js';
 
 export class RelationshipController {
   constructor(private readonly relationshipService: RelationshipService) {}
 
   getFriendRequests: RequestHandler = async (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const { direction, page, limit } = req.query as unknown as FriendRequestQuery;
+    const validatedUser = getAuthUser(req);
+    const { direction, page, limit } = req.validatedQuery as FriendRequestQuery;
     const requests = await this.relationshipService.getFriendRequests(
       { userId: validatedUser._id.toString() },
       { direction, page, limit },
     );
-    this.sendResponse(res, 200, requests);
+    sendResponse(res, 200, requests);
   };
 
   createFriendRequest: RequestHandler = async (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const { targetUserId } = req.body as CreateFriendRequestBody;
+    const validatedUser = getAuthUser(req);
+    const { targetUserId } = req.validatedBody as CreateFriendRequestBody;
     await this.relationshipService.createFriendRequest(validatedUser, { targetUserId });
-    this.sendResponse(res, 201, { message: 'Friend request sent' });
+    sendResponse(res, 201, { message: 'Friend request sent' });
   };
 
   acceptFriendRequest: RequestHandler = async (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const { requesterId } = req.body as UpdateFriendRequestBody;
+    const validatedUser = getAuthUser(req);
+    const { requesterId } = req.validatedBody as UpdateFriendRequestBody;
     await this.relationshipService.acceptFriendRequest(validatedUser, requesterId);
-    this.sendResponse(res, 200, { message: 'Friend request accepted' });
+    sendResponse(res, 200, { message: 'Friend request accepted' });
   };
 
   rejectFriendRequest: RequestHandler = async (req, res) => {
-    const validatedUser = req.user;
-    if (!validatedUser) {
-      throw new InvalidUserTokenError('Invalid user token');
-    }
-    const { requesterId } = req.body as UpdateFriendRequestBody;
+    const validatedUser = getAuthUser(req);
+    const { requesterId } = req.validatedBody as UpdateFriendRequestBody;
     await this.relationshipService.rejectFriendRequest(validatedUser, requesterId);
-    this.sendResponse(res, 200, { message: 'Friend request rejected' });
+    sendResponse(res, 200, { message: 'Friend request rejected' });
   };
-
-  private sendResponse<T>(res: Response, status: number, data: T): void {
-    res.status(status).json(successResponse(data));
-  }
 }

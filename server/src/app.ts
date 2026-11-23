@@ -11,6 +11,7 @@ import { AppContainer } from './container.js';
 import { createAuthRouter } from './domain/auth/auth.route.js';
 import { createUserRouter } from './domain/user/user.route.js';
 import { createRelationshipRouter } from './domain/relationship/relationship.route.js';
+import { createConversationRouter } from './domain/conversation/conversation.route.js';
 
 export const createApp = (container: AppContainer): Express => {
   const app = express();
@@ -46,6 +47,14 @@ export const createApp = (container: AppContainer): Express => {
       controller: container.relationship.relationshipController,
       accessTokenMiddleware: container.relationship.accessTokenMiddleware,
       userValidationMiddleware: container.relationship.userValidationMiddleware,
+    }),
+  );
+  app.use(
+    '/api/v1/conversations',
+    createConversationRouter({
+      controller: container.conversation.conversationController,
+      accessTokenMiddleware: container.conversation.accessTokenMiddleware,
+      userValidationMiddleware: container.conversation.userValidationMiddleware,
     }),
   );
 

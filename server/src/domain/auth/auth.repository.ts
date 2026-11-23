@@ -5,7 +5,7 @@ import type {
   InvalidateTokenRecord,
   TokenRecord,
 } from './auth.types.js';
-import { InvalidTokenError } from './error/invalid-token.js';
+import { InvalidTokenError } from './error/auth.js';
 
 export interface AuthRepository {
   createRefreshToken(record: CreateRefreshTokenRecord): Promise<void>;

@@ -1,18 +1,49 @@
-import { ApiError } from '../../../app/error/api.js';
-import { BadRequestError } from '../../../app/error/bad-request.js';
-import { ServerConflictError } from '../../../app/error/server-conflict.js';
-import { UnauthenticationError } from '../../../app/error/unauthentication.js';
-import { InvalidCredentialError } from '../../../domain/auth/error/invalid-credential.js';
-import { InvalidImageError } from '../../../domain/auth/error/invalid-image.js';
-import { InvalidTokenError } from '../../../domain/auth/error/invalid-token.js';
-import { LoginLockedError } from '../../../domain/auth/error/login-locked.js';
-import { DomainError } from '../../../domain/error/domain.js';
-import { FriendshipAlreadyExistError } from '../../../domain/relationship/error/friendship-already-exist.js';
-import { InvalidFriendshipChangeError } from '../../../domain/relationship/error/invalid-friendship-change.js';
-import { SendFriendRequestToSelfError } from '../../../domain/relationship/error/send-friend-request-to-self.js';
-import { InvalidUserTokenError } from '../../../domain/user/error/invalid-user-token.js';
-import { UserNotActiveError } from '../../../domain/user/error/user-not-active.js';
-import { UserNotExistError } from '../../../domain/user/error/user-not-exist.js';
+import {
+  ApiError,
+  BadRequestError,
+  ServerConflictError,
+  UnauthenticationError,
+  ForbiddenError,
+  NotFoundError,
+} from '../../../app/api.js';
+import {
+  InvalidCredentialError,
+  InvalidImageError,
+  InvalidTokenError,
+  LoginLockedError,
+} from '../../../domain/auth/error/auth.js';
+import { DomainError } from '../../../domain/shared/error.js';
+import {
+  FriendshipAlreadyExistError,
+  InvalidFriendshipChangeError,
+  SendFriendRequestToSelfError,
+  NotFriendError,
+} from '../../../domain/relationship/error/relationship.js';
+import {
+  InvalidUserTokenError,
+  UserNotActiveError,
+  UserNotExistError,
+} from '../../../domain/user/error/user.js';
+import {
+  CannotCreateDirectConversationWithSelfError,
+  ConversationDeletedError,
+  ConversationNotFoundError,
+  DirectConversationActionNotAllowedError,
+} from '../../../domain/conversation/error/conversation.js';
+import {
+  CannotInviteSelfError,
+  CannotKickSelfError,
+  CannotLeaveAsOwnerError,
+  MemberAlreadyExistsError,
+  MemberNotFoundError,
+  NotConversationMemberError,
+} from '../../../domain/conversation/error/membership.js';
+import {
+  CannotChangeOwnerRoleError,
+  CannotKickHigherOrEqualRoleError,
+  InsufficientConversationRoleError,
+  RoleUnchangedError,
+} from '../../../domain/conversation/error/permission.js';
 
 export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefined => {
   if (error instanceof InvalidTokenError) {
@@ -31,9 +62,39 @@ export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefin
     return new ServerConflictError(error.message);
   } else if (error instanceof SendFriendRequestToSelfError) {
     return new ServerConflictError(error.message);
+  } else if (error instanceof NotFriendError) {
+    return new BadRequestError(error.message);
   } else if (error instanceof UserNotActiveError) {
     return new ServerConflictError(error.message);
   } else if (error instanceof UserNotExistError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof CannotCreateDirectConversationWithSelfError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof ConversationNotFoundError) {
+    return new NotFoundError(error.message);
+  } else if (error instanceof ConversationDeletedError) {
+    return new NotFoundError(error.message);
+  } else if (error instanceof DirectConversationActionNotAllowedError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof NotConversationMemberError) {
+    return new ForbiddenError(error.message);
+  } else if (error instanceof InsufficientConversationRoleError) {
+    return new ForbiddenError(error.message);
+  } else if (error instanceof MemberNotFoundError) {
+    return new NotFoundError(error.message);
+  } else if (error instanceof CannotChangeOwnerRoleError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof RoleUnchangedError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof MemberAlreadyExistsError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof CannotInviteSelfError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof CannotKickSelfError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof CannotKickHigherOrEqualRoleError) {
+    return new ForbiddenError(error.message);
+  } else if (error instanceof CannotLeaveAsOwnerError) {
     return new ServerConflictError(error.message);
   } else {
     return undefined;

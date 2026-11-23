@@ -1,5 +1,5 @@
 import multer from 'multer';
-import { UnSupportedImageTypeError } from '../../../app/error/unsupported-image-type-error.js';
+import { UnSupportedImageTypeError } from '../../../app/api.js';
 
 const allowedMimeTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 

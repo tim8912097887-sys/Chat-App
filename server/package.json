@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:api": "newman run postman/user-collection.json"
+    "test:api": "newman run postman/relationship-and-conversation-collection.json"
   },
   "keywords": [],
   "author": "",

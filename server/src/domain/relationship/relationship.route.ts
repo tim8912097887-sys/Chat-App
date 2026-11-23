@@ -4,11 +4,9 @@ import {
   validateBody,
   validateQueryParams,
 } from '../../infrastructure/http/middleware/validate.js';
-import {
-  createFriendRequestSchema,
-  friendRequestQuerySchema,
-  updateFriendRequestSchema,
-} from './dto/friend-request.js';
+import { friendRequestQuerySchema } from './dto/get-friend-requests.js';
+import { createFriendRequestSchema } from './dto/create-friend-request.js';
+import { updateFriendRequestSchema } from './dto/update-friend-request.js';
 import type { RelationshipController } from './relationship.controller.js';
 
 export const createRelationshipRouter = (deps: {

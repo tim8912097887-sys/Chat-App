@@ -9,11 +9,16 @@ import {
 } from './domain/relationship/relationship.container.js';
 import { RealtimeEventPublisher } from './realtime/realtime-event-publisher.js';
 import { PresenceService } from './realtime/presence.service.js';
+import {
+  ConversationContainer,
+  createConversationContainer,
+} from './domain/conversation/conversation.container.js';
 
 export interface AppContainer {
   user: UserContainer;
   auth: AuthContainer;
   relationship: RelationshipContainer;
+  conversation: ConversationContainer;
   tokenService: TokenService;
   presenceService: PresenceService;
 }
@@ -25,6 +30,13 @@ export const buildContainer = (realtimeEvents: RealtimeEventPublisher): AppConta
   const user = createUserContainer({ tokenService, realtimeEvents });
 
   const relationship = createRelationshipContainer({
+    userRepository: user.userRepository,
+    tokenService,
+    realtimeEvents,
+  });
+
+  const conversation = createConversationContainer({
+    relationshipRepository: relationship.relationshipRepository,
     userRepository: user.userRepository,
     tokenService,
     realtimeEvents,
@@ -42,5 +54,5 @@ export const buildContainer = (realtimeEvents: RealtimeEventPublisher): AppConta
     presenceService,
   });
 
-  return { user, auth, relationship, tokenService, presenceService };
+  return { user, auth, relationship, conversation, tokenService, presenceService };
 };

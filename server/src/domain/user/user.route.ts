@@ -1,6 +1,7 @@
 import { RequestHandler, Router } from 'express';
 import type { UserController } from './user.controller.js';
-import { friendSearchQuerySchema, searchCodeQuerySchema } from './dto/query-params.js';
+import { searchCodeQuerySchema } from './dto/search.js';
+import { friendSearchQuerySchema } from './dto/search-friends.js';
 import { validateQueryParams } from '../../infrastructure/http/middleware/validate.js';
 
 export const createUserRouter = (deps: {

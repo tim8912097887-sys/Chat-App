@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { UploadApiResponse } from 'cloudinary';
 import { cloudinary } from '../../infrastructure/persistence/cloudinary.js';
-import { InvalidImageError } from './error/invalid-image.js';
+import { InvalidImageError } from './error/auth.js';
 
 export interface StoredImage {
   url: string;

@@ -1,0 +1,4643 @@
+{
+  "info": {
+    "_postman_id": "a7f3c8d2-4b1e-4d9a-9c21-100000000001",
+    "name": "Relationship & Conversation Edge Cases",
+    "description": "End-to-end edge-case test suite for /api/v1/friend-requests and /api/v1/conversations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "runId", "value": "", "type": "string" },
+    { "key": "nonExistentUuid", "value": "00000000-0000-4000-8000-000000000999", "type": "string" },
+    { "key": "invalidUuid", "value": "not-a-valid-uuid", "type": "string" },
+    { "key": "longName", "value": "", "type": "string" },
+    { "key": "longUrl", "value": "", "type": "string" },
+    { "key": "password", "value": "Password123!", "type": "string" },
+    { "key": "aliceEmail", "value": "", "type": "string" },
+    { "key": "aliceId", "value": "", "type": "string" },
+    { "key": "aliceToken", "value": "", "type": "string" },
+    { "key": "bobEmail", "value": "", "type": "string" },
+    { "key": "bobId", "value": "", "type": "string" },
+    { "key": "bobToken", "value": "", "type": "string" },
+    { "key": "charlieEmail", "value": "", "type": "string" },
+    { "key": "charlieId", "value": "", "type": "string" },
+    { "key": "charlieToken", "value": "", "type": "string" },
+    { "key": "daveEmail", "value": "", "type": "string" },
+    { "key": "daveId", "value": "", "type": "string" },
+    { "key": "daveToken", "value": "", "type": "string" },
+    { "key": "eveEmail", "value": "", "type": "string" },
+    { "key": "eveId", "value": "", "type": "string" },
+    { "key": "eveToken", "value": "", "type": "string" },
+    { "key": "frankEmail", "value": "", "type": "string" },
+    { "key": "frankId", "value": "", "type": "string" },
+    { "key": "frankToken", "value": "", "type": "string" },
+    { "key": "directConvId", "value": "", "type": "string" },
+    { "key": "groupConvId", "value": "", "type": "string" },
+    { "key": "groupWithImageConvId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "01 - Setup (Users & Auth Tokens)",
+      "item": [
+        {
+          "name": "Signup Alice",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runId = Date.now() + '_' + Math.floor(Math.random() * 100000);",
+                  "pm.collectionVariables.set('runId', runId);",
+                  "pm.collectionVariables.set('aliceEmail', `alice_${runId}@example.com`);",
+                  "pm.collectionVariables.set('bobEmail', `bob_${runId}@example.com`);",
+                  "pm.collectionVariables.set('charlieEmail', `charlie_${runId}@example.com`);",
+                  "pm.collectionVariables.set('daveEmail', `dave_${runId}@example.com`);",
+                  "pm.collectionVariables.set('eveEmail', `eve_${runId}@example.com`);",
+                  "pm.collectionVariables.set('frankEmail', `frank_${runId}@example.com`);",
+                  "pm.collectionVariables.set('longName', 'A'.repeat(81));",
+                  "pm.collectionVariables.set('longUrl', 'https://example.com/' + 'a'.repeat(2040));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Tester\",\n  \"email\": \"{{aliceEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Login Alice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('aliceToken', data.accessToken);",
+                  "pm.collectionVariables.set('aliceId', data.user.id || data.user._id || data.user.userId);",
+                  "pm.test('Saved Alice token & id', () => {",
+                  "  pm.expect(pm.collectionVariables.get('aliceToken')).to.be.a('string').and.not.empty;",
+                  "  pm.expect(pm.collectionVariables.get('aliceId')).to.be.a('string').and.not.empty;",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{aliceEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Signup Bob",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bob Tester\",\n  \"email\": \"{{bobEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Login Bob",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('bobToken', data.accessToken);",
+                  "pm.collectionVariables.set('bobId', data.user.id || data.user._id || data.user.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{bobEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Signup Charlie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Charlie Tester\",\n  \"email\": \"{{charlieEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Login Charlie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('charlieToken', data.accessToken);",
+                  "pm.collectionVariables.set('charlieId', data.user.id || data.user._id || data.user.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{charlieEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Signup Dave (Stranger)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dave Stranger\",\n  \"email\": \"{{daveEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Login Dave",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('daveToken', data.accessToken);",
+                  "pm.collectionVariables.set('daveId', data.user.id || data.user._id || data.user.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{daveEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Signup Eve",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Eve Tester\",\n  \"email\": \"{{eveEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Login Eve",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('eveToken', data.accessToken);",
+                  "pm.collectionVariables.set('eveId', data.user.id || data.user._id || data.user.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{eveEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Signup Frank (Token Revocation & Pending Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Frank Tester\",\n  \"email\": \"{{frankEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Auth & Middleware Edge Cases",
+      "item": [
+        {
+          "name": "Missing Authorization Header (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [{ "key": "direction", "value": "incoming" }]
+            }
+          }
+        },
+        {
+          "name": "Malformed Authorization Header - Wrong Scheme (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Token {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Malformed Authorization Header - Missing Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Invalid Access Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer invalid.jwt.token" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Login Frank (For Logout-All Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('frankToken', data.accessToken);",
+                  "pm.collectionVariables.set('frankId', data.user.id || data.user._id || data.user.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{frankEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Frank Logout-All (Bumps tokenVersion)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout-all"]
+            }
+          }
+        },
+        {
+          "name": "Frank Uses Revoked Access Token (401 TokenVersion Conflict)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{frankToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Relationship Domain (Friend Requests & Edge Cases)",
+      "item": [
+        {
+          "name": "Get Requests - Missing direction param (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Get Requests - Invalid direction value (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=accepted",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [{ "key": "direction", "value": "accepted" }]
+            }
+          }
+        },
+        {
+          "name": "Get Requests - Invalid page=0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming&page=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [
+                { "key": "direction", "value": "incoming" },
+                { "key": "page", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Requests - Invalid page non-integer (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming&page=1.5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [
+                { "key": "direction", "value": "incoming" },
+                { "key": "page", "value": "1.5" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Requests - Invalid limit=0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming&limit=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [
+                { "key": "direction", "value": "incoming" },
+                { "key": "limit", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Requests - Invalid limit exceeds max (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming&limit=99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [
+                { "key": "direction", "value": "incoming" },
+                { "key": "limit", "value": "99999" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send Request - Missing targetUserId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Send Request - Invalid targetUserId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{invalidUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Send Request - To Self (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Send Request - Non-existent User (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{nonExistentUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Accept Request - Invalid requesterId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{invalidUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Accept Request - Non-existent Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{nonExistentUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Reject Request - Invalid requesterId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{invalidUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Reject Request - Non-existent Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{nonExistentUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Alice Sends Friend Request to Bob (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Duplicate Request Same Direction Alice -> Bob (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Duplicate Request Reverse Direction Bob -> Alice (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Requester (Alice) Tries to Accept Own Outgoing Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Requester (Alice) Tries to Reject Own Outgoing Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Third Party (Dave) Tries to Accept Alice -> Bob Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{daveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Third Party (Dave) Tries to Reject Alice -> Bob Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{daveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Alice Sends Friend Request to Charlie (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{charlieId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Alice Sends Friend Request to Eve (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{eveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Alice Get Outgoing Requests Page 1 Limit 2 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Returns 2 outgoing requests', () => pm.expect(data).to.be.an('array').with.lengthOf(2));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=outgoing&page=1&limit=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [
+                { "key": "direction", "value": "outgoing" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "2" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Alice Get Outgoing Requests Page 2 Limit 2 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Returns 1 outgoing request on page 2', () => pm.expect(data).to.be.an('array').with.lengthOf(1));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=outgoing&page=2&limit=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [
+                { "key": "direction", "value": "outgoing" },
+                { "key": "page", "value": "2" },
+                { "key": "limit", "value": "2" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bob Get Incoming Requests (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "const aliceId = pm.collectionVariables.get('aliceId');",
+                  "pm.test('Contains request from Alice', () => {",
+                  "  pm.expect(data.some(r => r.userId === aliceId)).to.be.true;",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [{ "key": "direction", "value": "incoming" }]
+            }
+          }
+        },
+        {
+          "name": "Alice Get Incoming Requests Should Be Empty (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('No incoming requests for Alice', () => pm.expect(data).to.be.an('array').with.lengthOf(0));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests?direction=incoming",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"],
+              "query": [{ "key": "direction", "value": "incoming" }]
+            }
+          }
+        },
+        {
+          "name": "Eve Rejects Alice Request (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{eveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Eve Rejects Already Rejected Request Again (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{eveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Eve Tries to Accept Rejected Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{eveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Alice Reopens Rejected Request to Eve Same Direction (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{eveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Eve Rejects Reopened Request (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{eveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Eve Reopens Rejected Request Reverse Direction Eve -> Alice (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{eveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Alice Rejects Eve Reverse Request (Keep Rejected State) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{eveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Bob Accepts Alice Request (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Bob Tries to Accept Already Accepted Request (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Bob Tries to Reject Already Accepted Friendship (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Alice Sends Request When Already Friends with Bob (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Charlie Accepts Alice Request (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{charlieToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Bob Sends Friend Request to Eve (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{eveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        },
+        {
+          "name": "Eve Accepts Bob Request (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{eveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Alice Sends Pending Request to Frank (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"targetUserId\": \"{{frankId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friend-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "friend-requests"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Conversation Domain: Create & List",
+      "item": [
+        {
+          "name": "Create - Empty Body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create - Invalid Type (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"CHANNEL\",\n  \"name\": \"Test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Missing targetUserId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"DIRECT\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Invalid targetUserId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{invalidUuid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Extra Unknown Field .strict() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{bobId}}\",\n  \"name\": \"Should Not Allow\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Missing name (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"GROUP\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Whitespace-only name (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"   \"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Name Exceeds 80 Chars (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"{{longName}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Invalid imageUrl (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"Bad URL Group\",\n  \"imageUrl\": \"not-a-url\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - imageUrl Exceeds 2048 Chars (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"Long URL Group\",\n  \"imageUrl\": \"{{longUrl}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Extra Unknown Field .strict() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"Extra Field Group\",\n  \"targetUserId\": \"{{bobId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - With Self (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{aliceId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Non-existent User (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{nonExistentUuid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - With Non-Friend Stranger Dave (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{daveId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - With Pending Friend Request Frank (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{frankId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - With Rejected Friend Request Eve (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{eveId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Valid Alice & Bob (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('directConvId', data.conversationId);",
+                  "pm.test('Type is DIRECT and has 2 members', () => {",
+                  "  pm.expect(data.type).to.eql('DIRECT');",
+                  "  pm.expect(data.members).to.have.lengthOf(2);",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{bobId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Idempotent Same Initiator Alice & Bob (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Returns existing directConvId', () => {",
+                  "  pm.expect(data.conversationId).to.eql(pm.collectionVariables.get('directConvId'));",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{bobId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create DIRECT - Idempotent Reverse Initiator Bob & Alice (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Returns existing directConvId regardless of order', () => {",
+                  "  pm.expect(data.conversationId).to.eql(pm.collectionVariables.get('directConvId'));",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIRECT\",\n  \"targetUserId\": \"{{aliceId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Valid Trimmed Name Without imageUrl (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('groupConvId', data.conversationId);",
+                  "pm.test('Name trimmed & creator is OWNER', () => {",
+                  "  pm.expect(data.type).to.eql('GROUP');",
+                  "  pm.expect(data.name).to.eql('Study Group');",
+                  "  pm.expect(data.imageUrl).to.be.null;",
+                  "  pm.expect(data.members[0].role).to.eql('OWNER');",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"  Study Group  \"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Create GROUP - Valid With imageUrl (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.collectionVariables.set('groupWithImageConvId', data.conversationId);",
+                  "pm.test('Has imageUrl', () => pm.expect(data.imageUrl).to.eql('https://example.com/group.png'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GROUP\",\n  \"name\": \"Image Group\",\n  \"imageUrl\": \"https://example.com/group.png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Invalid offset=-1 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations?offset=-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"],
+              "query": [{ "key": "offset", "value": "-1" }]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Offset Exceeds Max 100001 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations?offset=100001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"],
+              "query": [{ "key": "offset", "value": "100001" }]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Invalid limit=0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations?limit=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"],
+              "query": [{ "key": "limit", "value": "0" }]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Limit Exceeds Max 101 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations?limit=101",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"],
+              "query": [{ "key": "limit", "value": "101" }]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Unknown Query Param .strict() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations?unknown=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"],
+              "query": [{ "key": "unknown", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Valid Default Alice (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Contains DIRECT with friend name and GROUP with group name', () => {",
+                  "  pm.expect(data).to.be.an('array').with.lengthOf(3);",
+                  "  const direct = data.find(c => c.conversationId === pm.collectionVariables.get('directConvId'));",
+                  "  const group = data.find(c => c.conversationId === pm.collectionVariables.get('groupConvId'));",
+                  "  pm.expect(direct.name).to.eql('Bob Tester');",
+                  "  pm.expect(group.name).to.eql('Study Group');",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Valid Pagination offset=1 limit=1 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Returns 1 item', () => pm.expect(data).to.be.an('array').with.lengthOf(1));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations?offset=1&limit=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"],
+              "query": [
+                { "key": "offset", "value": "1" },
+                { "key": "limit", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Empty List for Dave (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Returns empty array', () => pm.expect(data).to.be.an('array').with.lengthOf(0));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{daveToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Conversation Domain: Details & Update",
+      "item": [
+        {
+          "name": "Get Details - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Details - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{nonExistentUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Details - Non-Member Dave on GROUP (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{daveToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Details - Non-Member Dave on DIRECT (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{daveToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Details - Valid Member Bob on DIRECT (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Details - Valid Owner Alice on GROUP (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Renamed\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Empty Body Fails .refine() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Extra Unknown Field .strict() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Name\",\n  \"extra\": \"bad\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Whitespace-only name (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"   \"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Name Exceeds 80 Chars (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{longName}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Invalid imageUrl (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"imageUrl\": \"bad-url\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Ghost\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{nonExistentUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Non-Member Dave (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{daveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hacked\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - DIRECT Conversation Blocked (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Direct Rename\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Valid by OWNER Alice (Name & imageUrl) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Changes applied', () => {",
+                  "  pm.expect(data.changes.name).to.eql('Updated Study Group');",
+                  "  pm.expect(data.changes.imageUrl).to.eql('https://example.com/new.png');",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Study Group\",\n  \"imageUrl\": \"https://example.com/new.png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - Clear imageUrl with null by OWNER Alice (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('imageUrl cleared to null', () => pm.expect(data.changes.imageUrl).to.be.null);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"imageUrl\": null\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Conversation Domain: Invite & Role Management",
+      "item": [
+        {
+          "name": "Invite - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Invalid userId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{invalidUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Extra Field .strict() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{bobId}}\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{nonExistentUuid}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - DIRECT Conversation Blocked (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{charlieId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Non-Member Dave (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{daveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Self Alice Invites Alice (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{aliceId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Non-existent User (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{nonExistentUuid}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Non-Friend Dave (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{daveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Valid OWNER Alice Invites Bob (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Bob joined as MEMBER', () => pm.expect(data.member.role).to.eql('MEMBER'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Valid OWNER Alice Invites Charlie (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{charlieId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Already a Member Bob (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Insufficient Role MEMBER Charlie Tries to Invite (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{charlieToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{daveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Invalid memberId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{invalidUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "conversations",
+                "{{groupConvId}}",
+                "members",
+                "{{invalidUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Cannot Assign OWNER Role (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"OWNER\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Extra Field .strict() (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\",\n  \"extra\": true\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{nonExistentUuid}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - DIRECT Conversation Blocked (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Non-Member Dave (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{daveToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Insufficient Role MEMBER Charlie (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{charlieToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Non-existent Target User (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{nonExistentUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "conversations",
+                "{{groupConvId}}",
+                "members",
+                "{{nonExistentUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Target Exists (Dave) But Not Member (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{daveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{daveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Cannot Change OWNER Role (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"MEMBER\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{aliceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{aliceId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Role Unchanged MEMBER -> MEMBER (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"MEMBER\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - OWNER Promotes Bob to ADMIN (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "pm.test('Bob promoted to ADMIN', () => pm.expect(data.member.role).to.eql('ADMIN'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Role Unchanged ADMIN -> ADMIN (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - Insufficient Role ADMIN Bob Tries to Promote Charlie (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{charlieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{charlieId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Conversation - Insufficient Role MEMBER Charlie (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{charlieToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Member Cannot Rename\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Conversation - Valid by ADMIN Bob (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admin Renamed Group\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Valid by ADMIN Bob Invites Friend Eve (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{eveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - OWNER Alice Promotes Eve to ADMIN (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Conversation Domain: Kick, Leave & Soft Delete",
+      "item": [
+        {
+          "name": "Kick - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}/members/{{charlieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}", "members", "{{charlieId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Invalid memberId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{invalidUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "conversations",
+                "{{groupConvId}}",
+                "members",
+                "{{invalidUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kick - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}/members/{{charlieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "conversations",
+                "{{nonExistentUuid}}",
+                "members",
+                "{{charlieId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kick - DIRECT Conversation Blocked (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Non-Member Dave (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{daveToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{charlieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{charlieId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Insufficient Role MEMBER Charlie (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{charlieToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - OWNER Kicks Self Alice (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{aliceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{aliceId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - ADMIN Kicks Self Bob (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Non-existent Target User (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{nonExistentUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "conversations",
+                "{{groupConvId}}",
+                "members",
+                "{{nonExistentUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kick - Target Exists (Dave) But Not Member (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{daveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{daveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - ADMIN Bob Tries to Kick Higher Role OWNER Alice (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{aliceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{aliceId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - ADMIN Bob Tries to Kick Equal Role ADMIN Eve (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - OWNER Alice Demotes Eve to MEMBER (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"MEMBER\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Valid ADMIN Bob Kicks MEMBER Eve (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Already Kicked Member Eve Again (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Invite - Re-invite Eve by ADMIN Bob (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{eveId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Update Role - OWNER Alice Promotes Eve to ADMIN (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Kick - Valid OWNER Alice Kicks ADMIN Eve (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{eveId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{eveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Leave - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{charlieToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Leave - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{charlieToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{nonExistentUuid}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Leave - DIRECT Conversation Blocked (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Leave - Non-Member Dave (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{daveToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Leave - OWNER Alice Cannot Leave (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Delete - Insufficient Role MEMBER Charlie (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{charlieToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Leave - Valid MEMBER Charlie Leaves (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{charlieToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Leave - Already Left Member Charlie Tries Again (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{charlieToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Delete - Insufficient Role ADMIN Bob (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Leave - Valid ADMIN Bob Leaves (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bobToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Delete - Invalid conversationId UUID (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{invalidUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{invalidUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - Non-existent conversationId (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{nonExistentUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{nonExistentUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - DIRECT Conversation Blocked (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{directConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{directConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - Non-Member Dave (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{daveToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - Valid OWNER Alice Soft Deletes Group (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Delete Already Deleted Group Again (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Get Details (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Update Conversation (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"After Delete\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Invite Member (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{bobId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Update Member Role (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Kick Member (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/{{bobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "{{bobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Soft-Deleted - Leave Conversation (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{groupConvId}}/members/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{groupConvId}}", "members", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Conversations - Soft-Deleted Group Excluded from List (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data !== undefined ? json.data : json;",
+                  "const deletedId = pm.collectionVariables.get('groupConvId');",
+                  "pm.test('Deleted group is absent from list', () => {",
+                  "  pm.expect(data.some(c => c.conversationId === deletedId)).to.be.false;",
+                  "});",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
