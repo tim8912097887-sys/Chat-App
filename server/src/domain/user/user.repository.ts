@@ -1,7 +1,6 @@
 import type {
   CreateUserRecord,
   CreateUserResult,
-  FailedLoginResult,
   PaginationOptions,
   PublicUserRecord,
   UserSearchRecord,
@@ -16,12 +15,6 @@ export interface UserRepository {
   findActiveBySearchCode(searchCode: string): Promise<UserSearchRecord | null>;
   searchFriendByName(friendsId: string[], options: PaginationOptions): Promise<UserSearchRecord[]>;
   create(record: CreateUserRecord): Promise<CreateUserResult>;
-  /** Atomically bumps the attempt counter; locks the account and resets the counter at the limit. */
-  registerFailedLogin(
-    id: string,
-    options: { maxAttempts: number; lockedAt: Date },
-  ): Promise<FailedLoginResult>;
-  clearLoginState(id: string): Promise<void>;
   incrementTokenVersion(id: string, tokenVersion: number): Promise<void>;
 }
 
@@ -95,54 +88,6 @@ export class MongoUserRepository implements UserRepository {
       }
       throw err;
     }
-  }
-
-  /**
-   * Uses only single-document atomic operations (no transactions), so it also works on a
-   * standalone mongod, not just replica sets.
-   */
-  async registerFailedLogin(
-    id: string,
-    options: { maxAttempts: number; lockedAt: Date },
-  ): Promise<FailedLoginResult> {
-    const increment = await this.userModel
-      .updateOne(
-        {
-          _id: id,
-          loginLockedAt: null,
-          loginAttempt: { $lt: options.maxAttempts - 1 },
-        },
-        { $inc: { loginAttempt: 1 } },
-      )
-      .exec();
-
-    if (increment.modifiedCount > 0) {
-      return { locked: false };
-    }
-
-    const lock = await this.userModel
-      .updateOne(
-        {
-          _id: id,
-          loginLockedAt: null,
-          loginAttempt: { $gte: options.maxAttempts - 1 },
-        },
-        { $set: { loginAttempt: 0, loginLockedAt: options.lockedAt } },
-      )
-      .exec();
-
-    if (lock.modifiedCount > 0) {
-      return { locked: true };
-    }
-
-    const user = await this.findById(id);
-    return { locked: user?.loginLockedAt != null };
-  }
-
-  async clearLoginState(id: string): Promise<void> {
-    await this.userModel
-      .updateOne({ _id: id }, { $set: { loginAttempt: 0, loginLockedAt: null } })
-      .exec();
   }
 
   async incrementTokenVersion(id: string, tokenVersion: number): Promise<void> {

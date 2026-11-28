@@ -4,7 +4,6 @@ import type { UserRepository } from './user.repository.js';
 import type { RelationshipRepository } from '../relationship/relationship.repository.js';
 import type {
   CreateUserInput,
-  FailedLoginResult,
   PaginationOptions,
   PublicUser,
   User,
@@ -48,7 +47,8 @@ export class UserService {
     if (identity.userId === user._id) {
       state = RELATIONSHIP_STATE.SELF;
     } else {
-      const relationship = await this.relationshipRepository.findByUsers(identity.userId, user._id);
+      const pairKey = [identity.userId, user._id.toString()].sort().join(':');
+      const relationship = await this.relationshipRepository.findByPairKey(pairKey);
       if (relationship?.status === 'ACCEPTED') {
         state = RELATIONSHIP_STATE.FRIEND;
       } else if (relationship?.status === 'PENDING') {
@@ -108,17 +108,6 @@ export class UserService {
     throw new Error('Unable to generate a unique search code');
   }
 
-  registerFailedLogin(
-    userId: string,
-    options: { maxAttempts: number; lockedAt: Date },
-  ): Promise<FailedLoginResult> {
-    return this.userRepository.registerFailedLogin(userId, options);
-  }
-
-  clearLoginState(userId: string): Promise<void> {
-    return this.userRepository.clearLoginState(userId);
-  }
-
   incrementTokenVersion(userId: string, tokenVersion: number): Promise<void> {
     return this.userRepository.incrementTokenVersion(userId, tokenVersion);
   }
@@ -133,8 +122,6 @@ export class UserService {
       searchCode: userDocument.searchCode,
       status: userDocument.status,
       tokenVersion: userDocument.tokenVersion,
-      loginAttempt: userDocument.loginAttempt,
-      loginLockedAt: userDocument.loginLockedAt ?? null,
       createdAt: userDocument.createdAt,
       updatedAt: userDocument.updatedAt,
     };

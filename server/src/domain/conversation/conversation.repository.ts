@@ -42,22 +42,34 @@ export interface ConversationRepository {
   createGroupConversation(record: CreateGroupConversationRecord): Promise<ChatGroupDocument>;
   updateGroupConversation(
     conversationId: string,
+    expectedVersion: number,
     changes: UpdateConversationBody,
   ): Promise<ChatGroupDocument | null>;
+
   softDeleteGroupConversation(
     conversationId: string,
+    expectedVersion: number,
     deletedAt: Date,
   ): Promise<ChatGroupDocument | null>;
+
   updateMemberRole(
     conversationId: string,
+    expectedVersion: number,
     memberId: string,
     role: Exclude<MemberRole, 'OWNER'>,
   ): Promise<ChatGroupDocument | null>;
+
   addGroupMember(
     conversationId: string,
+    expectedVersion: number,
     member: AddGroupMemberRecord,
   ): Promise<ChatGroupDocument | null>;
-  removeGroupMember(conversationId: string, memberId: string): Promise<ChatGroupDocument | null>;
+
+  removeGroupMember(
+    conversationId: string,
+    expectedVersion: number,
+    memberId: string,
+  ): Promise<ChatGroupDocument | null>;
 }
 
 export class MongoConversationRepository implements ConversationRepository {
@@ -138,6 +150,7 @@ export class MongoConversationRepository implements ConversationRepository {
 
   async updateGroupConversation(
     conversationId: string,
+    expectedVersion: number,
     changes: UpdateConversationBody,
   ): Promise<ChatGroupDocument | null> {
     const setPayload: Record<string, unknown> = {};
@@ -151,15 +164,15 @@ export class MongoConversationRepository implements ConversationRepository {
 
     if (Object.keys(setPayload).length === 0) {
       return this.chatGroupModel
-        .findOne({ _id: conversationId, type: 'GROUP', deletedAt: null })
+        .findOne({ _id: conversationId, type: 'GROUP', version: expectedVersion, deletedAt: null })
         .lean<ChatGroupDocument>()
         .exec();
     }
 
     return this.chatGroupModel
       .findOneAndUpdate(
-        { _id: conversationId, type: 'GROUP', deletedAt: null },
-        { $set: setPayload },
+        { _id: conversationId, type: 'GROUP', version: expectedVersion, deletedAt: null },
+        { $set: setPayload, $inc: { version: 1 } },
         { new: true },
       )
       .lean<ChatGroupDocument>()
@@ -168,12 +181,13 @@ export class MongoConversationRepository implements ConversationRepository {
 
   async softDeleteGroupConversation(
     conversationId: string,
+    expectedVersion: number,
     deletedAt: Date,
   ): Promise<ChatGroupDocument | null> {
     return this.chatGroupModel
       .findOneAndUpdate(
-        { _id: conversationId, type: 'GROUP', deletedAt: null },
-        { $set: { deletedAt } },
+        { _id: conversationId, type: 'GROUP', version: expectedVersion, deletedAt: null },
+        { $set: { deletedAt }, $inc: { version: 1 } },
         { new: true },
       )
       .lean<ChatGroupDocument>()
@@ -182,6 +196,7 @@ export class MongoConversationRepository implements ConversationRepository {
 
   async updateMemberRole(
     conversationId: string,
+    expectedVersion: number,
     memberId: string,
     role: Exclude<MemberRole, 'OWNER'>,
   ): Promise<ChatGroupDocument | null> {
@@ -190,11 +205,13 @@ export class MongoConversationRepository implements ConversationRepository {
         {
           _id: conversationId,
           type: 'GROUP',
+          version: expectedVersion,
           deletedAt: null,
           'members.userId': memberId,
         },
         {
           $set: { 'members.$.role': role },
+          $inc: { version: 1 },
         },
         { new: true },
       )
@@ -204,6 +221,7 @@ export class MongoConversationRepository implements ConversationRepository {
 
   async addGroupMember(
     conversationId: string,
+    expectedVersion: number,
     member: AddGroupMemberRecord,
   ): Promise<ChatGroupDocument | null> {
     return this.chatGroupModel
@@ -211,11 +229,13 @@ export class MongoConversationRepository implements ConversationRepository {
         {
           _id: conversationId,
           type: 'GROUP',
+          version: expectedVersion,
           deletedAt: null,
           'members.userId': { $ne: member.userId },
         },
         {
           $push: { members: member },
+          $inc: { version: 1 },
         },
         { new: true },
       )
@@ -225,6 +245,7 @@ export class MongoConversationRepository implements ConversationRepository {
 
   async removeGroupMember(
     conversationId: string,
+    expectedVersion: number,
     memberId: string,
   ): Promise<ChatGroupDocument | null> {
     return this.chatGroupModel
@@ -232,11 +253,13 @@ export class MongoConversationRepository implements ConversationRepository {
         {
           _id: conversationId,
           type: 'GROUP',
+          version: expectedVersion,
           deletedAt: null,
           'members.userId': memberId,
         },
         {
           $pull: { members: { userId: memberId } },
+          $inc: { version: 1 },
         },
         { new: true },
       )

@@ -38,8 +38,6 @@ const userSchema = new Schema(
       required: true,
     },
     tokenVersion: { type: Number, default: 0, required: true },
-    loginAttempt: { type: Number, default: 0, required: true },
-    loginLockedAt: { type: Date, default: null },
   },
   { collection: 'users', timestamps: true, versionKey: false },
 );

@@ -75,8 +75,9 @@ export class RelationshipService {
     if (targetUser.status !== 'ACTIVE') {
       throw new UserNotExistError(input.targetUserId);
     }
+    const pairKey = [requesterId, input.targetUserId].sort().join(':');
 
-    const existing = await this.relationshipRepository.findByUsers(requesterId, input.targetUserId);
+    const existing = await this.relationshipRepository.findByPairKey(pairKey);
     if (existing) {
       if (existing.status === 'REJECTED') {
         const reopened = await this.relationshipRepository.reopenRejectedRequest(
@@ -101,8 +102,6 @@ export class RelationshipService {
       }
       throw new FriendshipAlreadyExistError('A friend request or friendship already exists');
     }
-
-    const pairKey = [requesterId, input.targetUserId].sort().join(':');
 
     const friendRequest = await this.relationshipRepository.createFriendRequest(
       requesterId,
@@ -136,11 +135,9 @@ export class RelationshipService {
     requesterId: string,
     status: 'ACCEPTED' | 'REJECTED',
   ): Promise<void> {
-    const request = await this.relationshipRepository.findPendingRequestByUsers(
-      requesterId,
-      responseUser._id.toString(),
-    );
-    if (!request) {
+    const pairKey = [requesterId, responseUser._id.toString()].sort().join(':');
+    const request = await this.relationshipRepository.findPendingRequestByPairKey(pairKey);
+    if (!request || request.requestedBy === responseUser._id.toString()) {
       throw new InvalidFriendshipChangeError('Friend request is not available to this user');
     }
 
@@ -154,6 +151,8 @@ export class RelationshipService {
   ): Promise<void> {
     const updated = await this.relationshipRepository.updatePendingRequestStatus(
       request._id,
+      request.requestedBy,
+      request.recipient,
       status,
     );
     if (!updated) throw new InvalidFriendshipChangeError('Friend request is no longer pending');

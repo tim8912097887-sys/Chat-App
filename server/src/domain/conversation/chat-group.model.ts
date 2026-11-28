@@ -57,6 +57,11 @@ const chatGroupSchema = new Schema(
     pairKey: {
       type: String,
     },
+    version: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
 
     deletedAt: {
       type: Date,
@@ -66,10 +71,14 @@ const chatGroupSchema = new Schema(
   { collection: 'chat_groups', timestamps: true, versionKey: false },
 );
 
-chatGroupSchema.index({ 'members.userId': 1, updatedAt: -1, _id: 1 });
-chatGroupSchema.index({ type: 1, 'members.userId': 1 });
+chatGroupSchema.index({
+  'members.userId': 1,
+  deletedAt: 1,
+  updatedAt: -1,
+  _id: 1,
+});
 chatGroupSchema.index(
-  { type: 1, pairKey: 1 },
+  { pairKey: 1 },
   { unique: true, partialFilterExpression: { type: 'DIRECT' } },
 );
 
@@ -83,25 +92,4 @@ export function registerChatGroupsModel(): ChatGroupModel {
     (mongoose.models.ChatGroup as ChatGroupModel) ??
     model<ChatGroupDocument, ChatGroupModel>('ChatGroup', chatGroupSchema)
   );
-}
-
-export async function migrateLegacyPairKeyIndex(): Promise<void> {
-  const chatGroupModel = registerChatGroupsModel();
-  await chatGroupModel.init();
-
-  const indexes = await chatGroupModel.collection.indexes();
-  const legacyIndex = indexes.find((index) => {
-    const keyEntries = Object.entries(index.key);
-    return (
-      index.unique === true &&
-      !index.partialFilterExpression &&
-      keyEntries.length === 1 &&
-      keyEntries[0]?.[0] === 'pairKey' &&
-      keyEntries[0]?.[1] === 1
-    );
-  });
-
-  if (legacyIndex?.name) {
-    await chatGroupModel.collection.dropIndex(legacyIndex.name);
-  }
 }

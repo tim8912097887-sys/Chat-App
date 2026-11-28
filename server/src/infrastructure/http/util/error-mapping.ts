@@ -10,7 +10,6 @@ import {
   InvalidCredentialError,
   InvalidImageError,
   InvalidTokenError,
-  LoginLockedError,
 } from '../../../domain/auth/error/auth.js';
 import { DomainError } from '../../../domain/shared/error.js';
 import {
@@ -19,13 +18,10 @@ import {
   SendFriendRequestToSelfError,
   NotFriendError,
 } from '../../../domain/relationship/error/relationship.js';
-import {
-  InvalidUserTokenError,
-  UserNotActiveError,
-  UserNotExistError,
-} from '../../../domain/user/error/user.js';
+import { UserNotActiveError, UserNotExistError } from '../../../domain/user/error/user.js';
 import {
   CannotCreateDirectConversationWithSelfError,
+  ConversationConflictError,
   ConversationDeletedError,
   ConversationNotFoundError,
   DirectConversationActionNotAllowedError,
@@ -34,6 +30,7 @@ import {
   CannotInviteSelfError,
   CannotKickSelfError,
   CannotLeaveAsOwnerError,
+  CannotUpdateSelfRoleError,
   MemberAlreadyExistsError,
   MemberNotFoundError,
   NotConversationMemberError,
@@ -48,12 +45,8 @@ import {
 export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefined => {
   if (error instanceof InvalidTokenError) {
     return new UnauthenticationError(error.message);
-  } else if (error instanceof InvalidUserTokenError) {
-    return new UnauthenticationError(error.message);
   } else if (error instanceof InvalidCredentialError) {
     return new BadRequestError(error.message);
-  } else if (error instanceof LoginLockedError) {
-    return new ServerConflictError(error.message);
   } else if (error instanceof InvalidImageError) {
     return new BadRequestError(error.message);
   } else if (error instanceof FriendshipAlreadyExistError) {
@@ -95,6 +88,10 @@ export const mapDomainErrorToApiError = (error: DomainError): ApiError | undefin
   } else if (error instanceof CannotKickHigherOrEqualRoleError) {
     return new ForbiddenError(error.message);
   } else if (error instanceof CannotLeaveAsOwnerError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof ConversationConflictError) {
+    return new ServerConflictError(error.message);
+  } else if (error instanceof CannotUpdateSelfRoleError) {
     return new ServerConflictError(error.message);
   } else {
     return undefined;

@@ -11,8 +11,6 @@ export interface User {
   searchCode: string;
   status: UserStatus;
   tokenVersion: number;
-  loginAttempt: number;
-  loginLockedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,7 +64,3 @@ export type CreateUserResult =
   | { status: 'CREATED'; user: UserDocument }
   | { status: 'EMAIL_TAKEN' }
   | { status: 'SEARCH_CODE_TAKEN' };
-
-export interface FailedLoginResult {
-  locked: boolean;
-}
