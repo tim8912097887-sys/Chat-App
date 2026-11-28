@@ -1,110 +1,94 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MongoUserRepository } from '../../../domain/user/user.repository.js';
-import { LOGOUT_ALL_URL } from '../../utils/auth/constants.js';
-import {
-  expectAuthError,
-  expectServerError,
-  expectSuccessDataResponse,
-} from '../../utils/common/assertion.js';
-import { api } from '../../utils/common/app.js';
+import { beforeEach, describe, it, vitest } from 'vitest';
 import { truncateAll, userModel } from '../../utils/common/query.js';
-import { USER_PROFILE_URL } from '../../utils/user/constants.js';
-import { profileRequest, signupAndLogin } from '../../utils/user/query.js';
+import { insertUser } from '../../utils/user/query.js';
+import { createAccessToken } from '../../utils/auth/factory.js';
+import { getProfileRequest } from '../../utils/user/request.js';
+import { expectServerError, expectSuccessDataResponse } from '../../utils/common/assertion.js';
+import { describeAuthenticationTests } from '../../utils/common/invalid-inputs.js';
 
-describe('user profile', () => {
+describe('Get User Profile', () => {
   beforeEach(async () => {
     await truncateAll();
+    vitest.clearAllMocks();
   });
 
-  describe('success', () => {
-    it('when profile is requested with a valid access token should return profile fields', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      const user = await userModel.findOne({ email });
-      expect(user).not.toBeNull();
+  describe('Success', () => {
+    it('when user has full profile including imageUrl should return user profile', async () => {
+      // Arrange
+      const user = await insertUser({
+        name: 'Alice',
+        email: 'alice@example.com',
+        imageUrl: 'https://cdn.example.com/alice.png',
+      });
+      const accessToken = await createAccessToken({
+        userId: user._id,
+        tokenVersion: user.tokenVersion,
+      });
 
-      const response = await profileRequest(accessToken);
+      // Act
+      const response = await getProfileRequest({ accessToken });
 
+      // Assert
       expectSuccessDataResponse(response, 200, {
-        id: user!._id.toString(),
-        name: user!.name,
-        email: user!.email,
+        id: user._id,
+        name: 'Alice',
+        email: 'alice@example.com',
+        searchCode: user.searchCode,
+        imageUrl: 'https://cdn.example.com/alice.png',
+      });
+    });
+
+    it('when user has no imageUrl should return profile with null imageUrl', async () => {
+      // Arrange
+      const user = await insertUser({
+        name: 'Bob',
+        email: 'bob@example.com',
         imageUrl: null,
-        searchCode: user!.searchCode,
+      });
+      const accessToken = await createAccessToken({
+        userId: user._id,
+        tokenVersion: user.tokenVersion,
+      });
+
+      // Act
+      const response = await getProfileRequest({ accessToken });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        id: user._id,
+        name: 'Bob',
+        email: 'bob@example.com',
+        searchCode: user.searchCode,
+        imageUrl: null,
       });
     });
   });
 
-  describe('authentication fail', () => {
-    it.each([
-      {
-        description: 'no access token',
-        authorization: undefined,
-        expectedDetail: 'Missing access token',
-      },
-      {
-        description: 'an authorization header that is not Bearer type',
-        authorization: 'Basic not-a-valid-token',
-        expectedDetail: 'Missing access token',
-      },
-      {
-        description: 'an invalid access token',
-        authorization: 'Bearer not-a-valid-token',
-        expectedDetail: 'Invalid refresh token',
-      },
-    ])(
-      'when profile is requested with $description should return 401',
-      async ({ authorization, expectedDetail }) => {
-        const request = api().get(USER_PROFILE_URL);
-        if (authorization) request.set('Authorization', authorization);
-
-        const response = await request;
-
-        expectAuthError(response, expectedDetail);
-      },
-    );
+  describeAuthenticationTests({
+    sendRequest: ({ authorizationHeader }) => getProfileRequest({ authorizationHeader }),
   });
 
-  describe('business logic fail', () => {
-    it('when profile is requested for a user that does not exist should return 401', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      await userModel.deleteOne({ email });
+  describe('Server Error', () => {
+    it('when database fails during user validation should return server error', async () => {
+      // Arrange
+      const user = await insertUser();
+      const accessToken = await createAccessToken({
+        userId: user._id,
+        tokenVersion: user.tokenVersion,
+      });
+      const findByIdSpy = vitest.spyOn(userModel, 'findById').mockImplementationOnce(() => {
+        throw new Error('Database connection failed');
+      });
 
-      const response = await profileRequest(accessToken);
+      try {
+        // Act
+        const response = await getProfileRequest({ accessToken });
 
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it('when profile is requested for an inactive user should return 401', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      await userModel.updateOne({ email }, { $set: { status: 'DISABLED' } });
-
-      const response = await profileRequest(accessToken);
-
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it('when profile is requested with a stale token version should return 401', async () => {
-      const { accessToken, refreshCookie } = await signupAndLogin();
-      const logoutResponse = await api().post(LOGOUT_ALL_URL).set('Cookie', refreshCookie);
-      expect(logoutResponse.status).toBe(200);
-
-      const response = await profileRequest(accessToken);
-
-      expectAuthError(response, 'Invalid user token');
-    });
-  });
-
-  describe('server error', () => {
-    it('when the user repository fails during profile lookup should return 500', async () => {
-      const { accessToken } = await signupAndLogin();
-      const findById = vi
-        .spyOn(MongoUserRepository.prototype, 'findById')
-        .mockRejectedValue(new Error('database unavailable'));
-
-      const response = await profileRequest(accessToken);
-
-      expectServerError(response);
-      expect(findById).toHaveBeenCalledOnce();
+        // Assert
+        expectServerError(response);
+      } finally {
+        findByIdSpy.mockRestore();
+      }
     });
   });
 });

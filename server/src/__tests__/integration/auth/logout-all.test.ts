@@ -1,164 +1,220 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../utils/common/app.js';
-import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
-import { authModel, truncateAll, userModel } from '../../utils/common/query.js';
-import { LOGOUT_ALL_URL, REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
+import { randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { truncateAll } from '../../utils/common/query.js';
+import {
+  createWrongTypeCookie,
+  findRefreshTokensByUserId,
+  insertAuthenticatedSession,
+  insertRefreshToken,
+  insertSessionForUser,
+} from '../../utils/auth/query.js';
+import { logoutAllRequest } from '../../utils/auth/request.js';
 import {
   expectAuthError,
   expectServerError,
   expectSuccessMessageResponse,
 } from '../../utils/common/assertion.js';
-import { MongoUserRepository } from '../../../domain/user/user.repository.js';
+import {
+  createExpiredRefreshCookie,
+  createRefreshCookieHeader,
+  extractCookieValue,
+} from '../../utils/auth/factory.js';
+import { REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
+import { findUserById } from '../../utils/user/query.js';
+import { invalidRefreshCookieCases } from '../../utils/auth/invalid-inputs.js';
+import { MongoAuthSessionRepository } from '../../../domain/auth/auth-session.repository.js';
 
-describe('logout-all', () => {
+describe('Logout All', () => {
   beforeEach(async () => {
     await truncateAll();
   });
 
-  describe('success', () => {
-    it('when logout-all uses an existing refresh token should revoke it and return 200 with message', async () => {
-      const { cookie } = await createRefreshCookie();
-
-      const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
-      const record = await userModel.find({});
-      const refreshTokens = await authModel.find({});
-
-      expectSuccessMessageResponse(res, 200, 'Logged out all sessions');
-      expect(record[0]?.tokenVersion).toBe(1);
-      expect(refreshTokens.every((refreshToken) => refreshToken.revokedAt !== null)).toBe(true);
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('business logic', () => {
-    it('when logout-all uses a refresh token for a user that does not exist should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await userModel.deleteOne({});
-
-      const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(await userModel.findOne({})).toBeNull();
-    });
-
-    it('when logout-all uses a refresh token for an inactive user should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await userModel.updateOne({}, { $set: { status: 'DISABLED' } });
-
-      const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
-      const user = await userModel.findOne({});
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(user?.tokenVersion).toBe(0);
-    });
-
-    it('when logout-all uses a refresh token with a mismatched token version should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await userModel.updateOne({}, { $inc: { tokenVersion: 1 } });
-
-      const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
-      const user = await userModel.findOne({});
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(user?.tokenVersion).toBe(1);
-    });
-
-    it('when user logout-all twice in a row first should return 200 with message for both and only increat token version 1 time', async () => {
-      const { cookie } = await createRefreshCookie();
-
-      const [first, second] = await Promise.all([
-        api().post(LOGOUT_ALL_URL).set('Cookie', cookie),
-        api().post(LOGOUT_ALL_URL).set('Cookie', cookie),
-      ]);
-
-      const userRecord = await userModel.findOne({});
-
-      expectSuccessMessageResponse(first, 200, 'Logged out all sessions');
-      expectSuccessMessageResponse(second, 200, 'Logged out all sessions');
-      expect(userRecord?.tokenVersion).toBe(1);
-    });
-  });
-
-  describe('auth error', () => {
-    it.each([
-      {
-        description:
-          'when logout-all receives an empty refresh token should return 401 with authentication error',
-        cookie: `${REFRESH_COOKIE_NAME}=`,
-        expectedDetail: 'Missing refresh token',
-      },
-      {
-        description:
-          'when logout-all receives a token under a different cookie name should return 401 with authentication error',
-        cookie: 'other_refresh_token=some-token',
-        expectedDetail: 'Missing refresh token',
-      },
-      {
-        description:
-          'when logout-all receives an invalid token should return 401 with authentication error',
-        cookie: `${REFRESH_COOKIE_NAME}=not-a-valid-token`,
-        expectedDetail: 'Invalid refresh token',
-      },
-      {
-        description:
-          'when logout-all receives an expired token should return 401 with authentication error',
-        cookie: 'expired',
-        expectedDetail: 'Invalid refresh token',
-      },
-      {
-        description:
-          'when logout-all does not receive a refresh cookie should return 401 with authentication error',
-        cookie: undefined,
-        expectedDetail: 'Missing refresh token',
-      },
-    ])('$description', async ({ cookie, expectedDetail }) => {
-      const cookieHeader = cookie === 'expired' ? await createExpiredRefreshCookie() : cookie;
-      const request = api().post(LOGOUT_ALL_URL);
-      if (cookieHeader !== undefined) request.set('Cookie', cookieHeader);
-
-      const res = await request;
-
-      expectAuthError(res, expectedDetail);
-    });
-  });
-
-  describe('server error', () => {
-    it('when user repository fails during logout-all should return 500 with server error', async () => {
+  describe('Success', () => {
+    it('when_logout_all_is_called_should_increment_token_version_revoke_all_user_tokens_and_clear_cookie', async () => {
       // Arrange
-      const { cookie } = await createRefreshCookie();
-      const invalidateRefreshTokenSpy = vi
-        .spyOn(MongoUserRepository.prototype, 'incrementTokenVersion')
+      const { user, cookie } = await insertAuthenticatedSession({
+        user: { email: 'user-a@example.com' },
+      });
+      await insertSessionForUser(user);
+
+      const { user: otherUser, record: otherUserToken } = await insertAuthenticatedSession({
+        user: { email: 'user-b@example.com' },
+      });
+
+      // Act
+      const res = await logoutAllRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expectSuccessMessageResponse(res, 200, 'Logged out all sessions');
+      expect(extractCookieValue(res.headers['set-cookie'], REFRESH_COOKIE_NAME)).toBe('');
+
+      const updatedUser = await findUserById(user._id);
+      expect(updatedUser?.tokenVersion).toBe(1);
+
+      const userTokens = await findRefreshTokensByUserId(user._id);
+      expect(userTokens).toHaveLength(2);
+      expect(userTokens.every((token) => token.revokedAt instanceof Date)).toBe(true);
+
+      const untouchedOtherUser = await findUserById(otherUser._id);
+      const untouchedOtherTokens = await findRefreshTokensByUserId(otherUser._id);
+      expect(untouchedOtherUser?.tokenVersion).toBe(0);
+      expect(untouchedOtherTokens).toHaveLength(1);
+      expect(untouchedOtherTokens[0]?._id).toBe(otherUserToken._id);
+      expect(untouchedOtherTokens[0]?.revokedAt).toBeNull();
+    });
+  });
+
+  describe('Authentication', () => {
+    it.each(invalidRefreshCookieCases)('$description', async ({ kind, cookie, expectedDetail }) => {
+      // Arrange
+      const { user, record } = await insertAuthenticatedSession();
+      let cookieHeader = cookie;
+      if (kind === 'expired') {
+        cookieHeader = await createExpiredRefreshCookie();
+      } else if (kind === 'wrong-token-type') {
+        cookieHeader = await createWrongTypeCookie(user._id);
+      }
+
+      // Act
+      const res = await logoutAllRequest(cookieHeader);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expectAuthError(res, expectedDetail);
+
+      const dbUser = await findUserById(user._id);
+      const userTokens = await findRefreshTokensByUserId(user._id);
+      expect(dbUser?.tokenVersion).toBe(0);
+      expect(userTokens[0]?._id).toBe(record._id);
+      expect(userTokens[0]?.revokedAt).toBeNull();
+    });
+  });
+
+  describe('Business Logic', () => {
+    it('when_logout_all_uses_token_for_nonexistent_user_should_return_401', async () => {
+      // Arrange
+      const missingUserId = randomUUID();
+      const { tokenHash, cookie } = await createRefreshCookieHeader({ userId: missingUserId });
+      await insertRefreshToken({ userId: missingUserId, tokenHash });
+
+      // Act
+      const res = await logoutAllRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+      expect(await findUserById(missingUserId)).toBeNull();
+    });
+
+    it('when_logout_all_uses_token_for_disabled_user_should_return_401_and_not_modify_state', async () => {
+      // Arrange
+      const { user, cookie } = await insertAuthenticatedSession({
+        user: { status: 'DISABLED' },
+      });
+
+      // Act
+      const res = await logoutAllRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const dbUser = await findUserById(user._id);
+      const tokens = await findRefreshTokensByUserId(user._id);
+      expect(dbUser?.tokenVersion).toBe(0);
+      expect(tokens[0]?.revokedAt).toBeNull();
+    });
+
+    it('when_logout_all_uses_token_with_mismatched_token_version_should_return_401', async () => {
+      // Arrange
+      const { user, cookie } = await insertAuthenticatedSession({
+        user: { tokenVersion: 1 },
+        jwtTokenVersion: 0,
+      });
+
+      // Act
+      const res = await logoutAllRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const dbUser = await findUserById(user._id);
+      const tokens = await findRefreshTokensByUserId(user._id);
+      expect(dbUser?.tokenVersion).toBe(1);
+      expect(tokens[0]?.revokedAt).toBeNull();
+    });
+  });
+
+  describe('Concurrency', () => {
+    it('when_two_concurrent_logout_all_requests_use_same_token_should_increment_token_version_once_and_revoke_all_tokens', async () => {
+      // Arrange
+      const { user, cookie } = await insertAuthenticatedSession();
+      await insertSessionForUser(user);
+
+      // Act
+      const responses = await Promise.all([logoutAllRequest(cookie), logoutAllRequest(cookie)]);
+
+      // Assert
+      const [first, second] = [...responses].sort((a, b) => a.status - b.status);
+      expect(first?.status).toBe(200);
+      expectSuccessMessageResponse(first!, 200, 'Logged out all sessions');
+      expect([200, 401]).toContain(second?.status);
+
+      const dbUser = await findUserById(user._id);
+      const userTokens = await findRefreshTokensByUserId(user._id);
+      expect(dbUser?.tokenVersion).toBe(1);
+      expect(userTokens).toHaveLength(2);
+      expect(userTokens.every((token) => token.revokedAt instanceof Date)).toBe(true);
+    });
+  });
+
+  describe('Server Error', () => {
+    it('when_revoked_all_session_fails_should_return_500_and_not_revoke_tokens', async () => {
+      // Arrange
+      const { user, cookie } = await insertAuthenticatedSession();
+      const incrementSpy = vi
+        .spyOn(MongoAuthSessionRepository.prototype, 'revokeAllSessions')
         .mockRejectedValue(new Error('database unavailable'));
 
       // Act
-      const res = await api().post(LOGOUT_ALL_URL).set('Cookie', cookie);
+      const res = await logoutAllRequest(cookie);
 
       // Assert
+      expect(res.status).toBe(500);
       expectServerError(res);
-      expect(invalidateRefreshTokenSpy).toHaveBeenCalledOnce();
+      expect(incrementSpy).toHaveBeenCalledOnce();
+
+      const dbUser = await findUserById(user._id);
+      const tokens = await findRefreshTokensByUserId(user._id);
+      expect(dbUser?.tokenVersion).toBe(0);
+      expect(tokens[0]?.revokedAt).toBeNull();
     });
   });
 });

@@ -1,62 +1,43 @@
-import { expect } from 'vitest';
-import { LOGIN_URL, REFRESH_COOKIE_NAME, SIGNUP_URL } from '../auth/constants.js';
-import { loginUserInput, signupUserInput } from '../auth/factory.js';
-import { api } from '../common/app.js';
-import { FRIEND_SEARCH_URL, USER_PROFILE_URL, USER_SEARCH_URL } from './constants.js';
+import { hashPassword } from '../../../domain/auth/util/password-hasher.js';
+import { UserDocument } from '../../../domain/user/user.model.js';
+import { TEST_PASSWORD_HASH_COST } from '../auth/constants.js';
+import { userModel } from '../common/query.js';
+import { buildUserSeedData, CreateUserSeedOptions } from './factory.js';
 
-export async function signupAndLogin() {
-  const input = signupUserInput({ email: `search-${crypto.randomUUID()}@example.com` });
-  const signupResponse = await api().post(SIGNUP_URL).send(input);
-  expect(signupResponse.status).toBe(201);
+export async function insertUser(options: CreateUserSeedOptions = {}): Promise<UserDocument> {
+  const seed = buildUserSeedData(options);
+  const passwordHash = await hashPassword(seed.password, TEST_PASSWORD_HASH_COST);
 
-  const loginResponse = await api()
-    .post(LOGIN_URL)
-    .send(loginUserInput({ email: input.email, password: input.password }));
-  expect(loginResponse.status).toBe(200);
-
-  const loginBody = loginResponse.body;
-  expect(loginBody).toMatchObject({
-    state: 'success',
-    error: null,
-    data: expect.objectContaining({
-      accessToken: expect.any(String),
-    }),
+  const doc = await userModel.create({
+    _id: seed.id,
+    name: seed.name,
+    email: seed.email,
+    passwordHash,
+    imageUrl: seed.imageUrl,
+    searchCode: seed.searchCode,
+    status: seed.status,
+    tokenVersion: seed.tokenVersion,
   });
-  const accessToken = loginBody.data.accessToken;
 
-  const responseHeaders = loginResponse.headers;
-
-  const setCookieHeader = responseHeaders['set-cookie'];
-  const refreshCookie = Array.isArray(setCookieHeader)
-    ? setCookieHeader.find((value) => value.startsWith(`${REFRESH_COOKIE_NAME}=`))
-    : setCookieHeader?.startsWith(`${REFRESH_COOKIE_NAME}=`)
-      ? setCookieHeader
-      : undefined;
-  if (!refreshCookie) {
-    throw new Error('Login response did not include a refresh token cookie');
-  }
-
-  return {
-    email: input.email,
-    accessToken,
-    refreshCookie,
-  };
+  return doc.toObject();
 }
 
-export function friendSearchRequest(accessToken?: string) {
-  const request = api().get(FRIEND_SEARCH_URL);
-  if (accessToken) request.set('Authorization', `Bearer ${accessToken}`);
-  return request;
+export async function findUserByEmail(email: string): Promise<UserDocument | null> {
+  return userModel.findOne({ email: email.trim().toLowerCase() }).lean().exec();
 }
 
-export function searchUserRequest(accessToken?: string) {
-  const request = api().get(USER_SEARCH_URL);
-  if (accessToken) request.set('Authorization', `Bearer ${accessToken}`);
-  return request;
+export async function findUserById(id: string): Promise<UserDocument | null> {
+  return userModel.findById(id).lean().exec();
 }
 
-export function profileRequest(accessToken?: string) {
-  const request = api().get(USER_PROFILE_URL);
-  if (accessToken) request.set('Authorization', `Bearer ${accessToken}`);
-  return request;
+export async function findAllUsers(): Promise<UserDocument[]> {
+  return userModel.find({}).lean().exec();
+}
+
+export async function deleteUserById(id: string): Promise<void> {
+  await userModel.deleteOne({ _id: id }).exec();
+}
+
+export async function updateUserStatusRaw(userId: string, status: string): Promise<void> {
+  await userModel.updateOne({ _id: userId }, { status });
 }

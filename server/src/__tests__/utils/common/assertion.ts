@@ -54,3 +54,33 @@ export function expectServerConflictError(response: Response, expectedDetail: st
   });
   expect(response.body.error.detail).toContain(expectedDetail);
 }
+
+export function expectForbiddenError(response: Response, expectedDetail: string): void {
+  expect(response.status).toBe(403);
+  expect(response.body).toMatchObject({
+    state: 'error',
+    error: { code: 'ForbiddenError' },
+    data: null,
+  });
+  expect(response.body.error.detail).toContain(expectedDetail);
+}
+
+export function expectNotFoundError(response: Response, expectedDetail: string): void {
+  expect(response.status).toBe(404);
+  expect(response.body).toMatchObject({
+    state: 'error',
+    error: { code: 'NotFoundError' },
+    data: null,
+  });
+  expect(response.body.error.detail).toContain(expectedDetail);
+}
+
+export function expectBadRequestError(response: Response, expectedDetail: string): void {
+  expect(response.status).toBe(400);
+  expect(response.body).toMatchObject({
+    state: 'error',
+    error: { code: 'BadRequestError' },
+    data: null,
+  });
+  expect(response.body.error.detail).toContain(expectedDetail);
+}

@@ -1,239 +1,393 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../utils/common/app.js';
-import { createExpiredRefreshCookie, createRefreshCookie } from '../../utils/auth/factory.js';
-import { authModel, truncateAll, userModel } from '../../utils/common/query.js';
-import { REFRESH_COOKIE_NAME, REFRESH_URL } from '../../utils/auth/constants.js';
+import { randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { authModel, truncateAll } from '../../utils/common/query.js';
+import { refreshRequest } from '../../utils/auth/request.js';
+import {
+  createUnstoredRefreshCookie,
+  createWrongTypeCookie,
+  findAllRefreshTokens,
+  findRefreshTokenById,
+  findRefreshTokensByFamilyId,
+  insertAuthenticatedSession,
+  insertRefreshToken,
+} from '../../utils/auth/query.js';
 import {
   expectAuthError,
   expectServerError,
   expectSuccessDataResponse,
 } from '../../utils/common/assertion.js';
+import {
+  createExpiredRefreshCookie,
+  createRefreshCookieHeader,
+  extractCookieValue,
+  hashToken,
+} from '../../utils/auth/factory.js';
+import { findUserById, insertUser } from '../../utils/user/query.js';
+import { invalidRefreshCookieCases } from '../../utils/auth/invalid-inputs.js';
 import { MongoAuthRepository } from '../../../domain/auth/auth.repository.js';
+import { REFRESH_COOKIE_NAME } from '../../utils/auth/constants.js';
 
-describe('refresh', () => {
+describe('Refresh', () => {
   beforeEach(async () => {
     await truncateAll();
   });
 
-  describe('success', () => {
-    it('when refresh uses an existing refresh token should revoke it and return 200 with access token', async () => {
-      const { cookie } = await createRefreshCookie();
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      const res = await api().post(REFRESH_URL).set('Cookie', cookie);
-      const userRecord = await userModel.find({});
-      const authRecord = await authModel.find({});
-      const invalidateRefreshToken = authRecord.find((r) => r.revokedAt !== null);
-      const newRefreshToken = authRecord.find((r) => r.revokedAt === null);
+  describe('Success', () => {
+    it('when_refresh_uses_valid_token_should_rotate_token_and_return_200_with_access_token', async () => {
+      // Arrange
+      const { user, record, cookie } = await insertAuthenticatedSession();
 
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(200);
       expectSuccessDataResponse(res, 200, {
         accessToken: expect.any(String),
         user: {
-          id: expect.any(String),
-          name: 'Test User',
+          id: user._id,
+          name: user.name,
           imageUrl: null,
-          searchCode: expect.any(String),
+          searchCode: user.searchCode,
         },
       });
-      expect(userRecord[0]?.tokenVersion).toBe(0);
-      expect(newRefreshToken?.revokedAt).toBeNull();
-      expect(invalidateRefreshToken?.revokedAt).not.toBeNull();
-      expect(newRefreshToken?.userId).toBe(userRecord[0]?._id.toString());
-      expect(invalidateRefreshToken?.userId).toBe(userRecord[0]?._id.toString());
+
+      const newRawToken = extractCookieValue(res.headers['set-cookie'], REFRESH_COOKIE_NAME);
+      expect(newRawToken).toBeTruthy();
+
+      const updatedUser = await findUserById(user._id);
+      expect(updatedUser?.tokenVersion).toBe(0);
+
+      const allTokens = await findAllRefreshTokens();
+      expect(allTokens).toHaveLength(2);
+
+      const oldRecord = allTokens.find((item) => item._id === record._id);
+      const newRecord = allTokens.find((item) => item._id !== record._id);
+
+      expect(oldRecord).toEqual(
+        expect.objectContaining({
+          _id: record._id,
+          familyId: record.familyId,
+          userId: user._id,
+          revokedAt: expect.any(Date),
+          replacedById: newRecord?._id,
+        }),
+      );
+      expect(newRecord).toEqual(
+        expect.objectContaining({
+          _id: oldRecord?.replacedById,
+          familyId: record.familyId,
+          userId: user._id,
+          parentId: record._id,
+          tokenHash: hashToken(newRawToken!),
+          replacedById: null,
+          revokedAt: null,
+        }),
+      );
     });
   });
 
-  describe('business logic', () => {
-    it('when refresh uses a refresh token for a user that does not exist should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await userModel.deleteOne({});
-
-      const res = await api().post(REFRESH_URL).set('Cookie', cookie);
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(await userModel.findOne({})).toBeNull();
-    });
-
-    it('when refresh uses a refresh token for an inactive user should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await userModel.updateOne({}, { $set: { status: 'DISABLED' } });
-
-      const res = await api().post(REFRESH_URL).set('Cookie', cookie);
-      const user = await userModel.findOne({});
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(user?.tokenVersion).toBe(0);
-    });
-
-    it('when refresh uses a refresh token record that does not exist should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await authModel.deleteOne({});
-
-      const res = await api().post(REFRESH_URL).set('Cookie', cookie);
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(await authModel.findOne({})).toBeNull();
-    });
-
-    it('when refresh reuses a previously used refresh token should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-
-      const firstRes = await api().post(REFRESH_URL).set('Cookie', cookie);
-      const secondRes = await api().post(REFRESH_URL).set('Cookie', cookie);
-
-      expectSuccessDataResponse(firstRes, 200, {
-        accessToken: expect.any(String),
-        user: {
-          id: expect.any(String),
-          name: 'Test User',
-          imageUrl: null,
-          searchCode: expect.any(String),
-        },
-      });
-      expect(secondRes.status).toBe(401);
-      expect(secondRes.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      const tokens = await authModel.find({});
-      expect(tokens.every((token) => token.revokedAt !== null)).toBe(true);
-    });
-
-    it('when refresh uses a refresh token with a mismatched token version should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-      await userModel.updateOne({}, { $inc: { tokenVersion: 1 } });
-
-      const res = await api().post(REFRESH_URL).set('Cookie', cookie);
-      const user = await userModel.findOne({});
-
-      expect(res.status).toBe(401);
-      expect(res.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-      expect(user?.tokenVersion).toBe(1);
-    });
-
-    it('when user refresh twice in a row first should return 200 with access token and second should return 401 with authentication error', async () => {
-      const { cookie } = await createRefreshCookie();
-
-      const res = await Promise.all([
-        api().post(REFRESH_URL).set('Cookie', cookie),
-        api().post(REFRESH_URL).set('Cookie', cookie),
-      ]);
-      const [first, second] = res.sort((a, b) => a.status - b.status);
-
-      expectSuccessDataResponse(first, 200, {
-        accessToken: expect.any(String),
-        user: {
-          id: expect.any(String),
-          name: 'Test User',
-          imageUrl: null,
-          searchCode: expect.any(String),
-        },
-      });
-      expect(second.status).toBe(401);
-      expect(second.body).toMatchObject({
-        state: 'error',
-        error: {
-          code: 'UnauthenticationError',
-          detail: 'Invalid token',
-        },
-        data: null,
-      });
-    });
-  });
-
-  describe('auth error', () => {
-    it.each([
-      {
-        description:
-          'when refresh receives an empty refresh token should return 401 with authentication error',
-        cookie: `${REFRESH_COOKIE_NAME}=`,
-        expectedDetail: 'Missing refresh token',
-      },
-      {
-        description:
-          'when refresh receives a token under a different cookie name should return 401 with authentication error',
-        cookie: 'other_refresh_token=some-token',
-        expectedDetail: 'Missing refresh token',
-      },
-      {
-        description:
-          'when refresh receives an invalid token should return 401 with authentication error',
-        cookie: `${REFRESH_COOKIE_NAME}=not-a-valid-token`,
-        expectedDetail: 'Invalid refresh token',
-      },
-      {
-        description:
-          'when refresh receives an expired token should return 401 with authentication error',
-        cookie: 'expired',
-        expectedDetail: 'Invalid refresh token',
-      },
-      {
-        description:
-          'when refresh does not receive a refresh cookie should return 401 with authentication error',
-        cookie: undefined,
-        expectedDetail: 'Missing refresh token',
-      },
-    ])('$description', async ({ cookie, expectedDetail }) => {
-      const cookieHeader = cookie === 'expired' ? await createExpiredRefreshCookie() : cookie;
-      const request = api().post(REFRESH_URL);
-      if (cookieHeader !== undefined) request.set('Cookie', cookieHeader);
-
-      const res = await request;
-
-      expectAuthError(res, expectedDetail);
-    });
-  });
-
-  describe('server error', () => {
-    it('when auth repository fails during refresh should return 500 with server error and not revoke refresh token', async () => {
+  describe('Authentication', () => {
+    it.each(invalidRefreshCookieCases)('$description', async ({ kind, cookie, expectedDetail }) => {
       // Arrange
-      const { cookie } = await createRefreshCookie();
-      const invalidateRefreshTokenSpy = vi
+      let cookieHeader = cookie;
+      if (kind === 'expired') {
+        cookieHeader = await createExpiredRefreshCookie();
+      } else if (kind === 'wrong-token-type') {
+        cookieHeader = await createWrongTypeCookie('some-user-id');
+      }
+
+      // Act
+      const res = await refreshRequest(cookieHeader);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expectAuthError(res, expectedDetail);
+      expect(await findAllRefreshTokens()).toHaveLength(0);
+    });
+  });
+
+  describe('Business Logic', () => {
+    it('when_refresh_uses_token_for_nonexistent_user_should_return_401', async () => {
+      // Arrange
+      const missingUserId = randomUUID();
+      const { tokenHash, cookie } = await createRefreshCookieHeader({ userId: missingUserId });
+      await insertRefreshToken({ userId: missingUserId, tokenHash });
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+      expect(await findUserById(missingUserId)).toBeNull();
+    });
+
+    it('when_refresh_uses_token_for_disabled_user_should_return_401_and_not_revoke_token', async () => {
+      // Arrange
+      const { user, record, cookie } = await insertAuthenticatedSession({
+        user: { status: 'DISABLED' },
+      });
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const dbUser = await findUserById(user._id);
+      const dbToken = await findRefreshTokenById(record._id);
+      expect(dbUser?.tokenVersion).toBe(0);
+      expect(dbToken?.revokedAt).toBeNull();
+      expect(await findAllRefreshTokens()).toHaveLength(1);
+    });
+
+    it('when_refresh_uses_token_with_mismatched_token_version_should_return_401', async () => {
+      // Arrange
+      const { user, record, cookie } = await insertAuthenticatedSession({
+        user: { tokenVersion: 1 },
+        jwtTokenVersion: 0,
+      });
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const dbUser = await findUserById(user._id);
+      const dbToken = await findRefreshTokenById(record._id);
+      expect(dbUser?.tokenVersion).toBe(1);
+      expect(dbToken?.revokedAt).toBeNull();
+    });
+
+    it('when_refresh_uses_token_without_db_record_should_return_401', async () => {
+      // Arrange
+      const user = await insertUser();
+      const cookie = await createUnstoredRefreshCookie(user._id, user.tokenVersion);
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+      expect(await findAllRefreshTokens()).toHaveLength(0);
+    });
+
+    it('when_refresh_uses_expired_db_token_record_should_return_401', async () => {
+      // Arrange
+      const { cookie } = await insertAuthenticatedSession({
+        token: { expiredAt: new Date(Date.now() - 1000) },
+      });
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+      expect(await findAllRefreshTokens()).toHaveLength(1);
+    });
+
+    it('when_refresh_reuses_already_replaced_token_should_return_401_and_revoke_token_family', async () => {
+      // Arrange
+      const user = await insertUser();
+      const familyId = randomUUID();
+      const parentId = randomUUID();
+      const childId = randomUUID();
+
+      const { tokenHash: parentHash, cookie: parentCookie } = await createRefreshCookieHeader({
+        userId: user._id,
+        tokenVersion: user.tokenVersion,
+      });
+      const { tokenHash: childHash } = await createRefreshCookieHeader({
+        userId: user._id,
+        tokenVersion: user.tokenVersion,
+      });
+
+      await insertRefreshToken({
+        id: parentId,
+        familyId,
+        userId: user._id,
+        tokenHash: parentHash,
+        revokedAt: new Date(Date.now() - 6 * 60 * 1000),
+        replacedById: childId,
+      });
+      await insertRefreshToken({
+        id: childId,
+        familyId,
+        userId: user._id,
+        tokenHash: childHash,
+        parentId,
+        revokedAt: null,
+        replacedById: null,
+      });
+
+      // Act
+      const res = await refreshRequest(parentCookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const familyTokens = await findRefreshTokensByFamilyId(familyId);
+      expect(familyTokens).toHaveLength(2);
+      expect(familyTokens.every((token) => token.revokedAt !== null)).toBe(true);
+    });
+
+    it('when_refresh_uses_revoked_logged_out_token_should_return_401_and_not_create_token', async () => {
+      // Arrange
+      const { record, cookie } = await insertAuthenticatedSession({
+        token: { revokedAt: new Date(), replacedById: null },
+      });
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const allTokens = await findAllRefreshTokens();
+      expect(allTokens).toHaveLength(1);
+      expect(allTokens[0]?._id).toBe(record._id);
+    });
+  });
+
+  describe('Concurrency', () => {
+    it('when_two_concurrent_refresh_requests_use_same_token_should_allow_only_one_and_prevent_duplicate_tokens', async () => {
+      // Arrange
+      const { user, record, cookie } = await insertAuthenticatedSession();
+
+      // Act
+      const responses = await Promise.all([refreshRequest(cookie), refreshRequest(cookie)]);
+
+      // Assert
+      const [succeeded, rejected] = [...responses].sort((a, b) => a.status - b.status);
+      expect(succeeded?.status).toBe(200);
+      expectSuccessDataResponse(succeeded!, 200, {
+        accessToken: expect.any(String),
+        user: {
+          id: user._id,
+          name: user.name,
+          imageUrl: null,
+          searchCode: user.searchCode,
+        },
+      });
+      expect(rejected?.status).toBe(401);
+      expect(rejected?.body).toMatchObject({
+        state: 'error',
+        error: {
+          code: 'UnauthenticationError',
+          detail: 'Invalid token',
+        },
+        data: null,
+      });
+
+      const tokens = await findAllRefreshTokens();
+      expect(tokens).toHaveLength(2);
+
+      const original = tokens.find((token) => token._id === record._id);
+      const child = tokens.find((token) => token._id !== record._id);
+      expect(original?.revokedAt).toBeInstanceOf(Date);
+      expect(original?.replacedById).toBe(child?._id);
+    });
+  });
+
+  describe('Server Error', () => {
+    it('when_atomic_update_fails_during_refresh_should_return_500_and_not_revoke_token', async () => {
+      // Arrange
+      const { record, cookie } = await insertAuthenticatedSession();
+      const atomicUpdateSpy = vi
         .spyOn(MongoAuthRepository.prototype, 'atomicUpdateRefreshToken')
         .mockRejectedValue(new Error('database unavailable'));
 
       // Act
-      const res = await api().post(REFRESH_URL).set('Cookie', cookie);
-      const token = await authModel.findOne({});
+      const res = await refreshRequest(cookie);
 
       // Assert
+      expect(res.status).toBe(500);
       expectServerError(res);
-      expect(invalidateRefreshTokenSpy).toHaveBeenCalledOnce();
-      expect(token?.revokedAt).toBeNull();
+      expect(atomicUpdateSpy).toHaveBeenCalledOnce();
+
+      const dbToken = await findRefreshTokenById(record._id);
+      expect(dbToken?.revokedAt).toBeNull();
+      expect(dbToken?.replacedById).toBeNull();
+      expect(await findAllRefreshTokens()).toHaveLength(1);
+    });
+
+    it('when_transaction_fails_creating_replacement_token_should_rollback_revocation_and_return_500', async () => {
+      // Arrange
+      const { record, cookie } = await insertAuthenticatedSession();
+      vi.spyOn(authModel, 'create').mockRejectedValueOnce(new Error('insert failed'));
+
+      // Act
+      const res = await refreshRequest(cookie);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expectServerError(res);
+
+      const dbToken = await findRefreshTokenById(record._id);
+      expect(dbToken?.revokedAt).toBeNull();
+      expect(dbToken?.replacedById).toBeNull();
+      expect(await findAllRefreshTokens()).toHaveLength(1);
     });
   });
 });

@@ -1,380 +1,409 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../utils/common/app.js';
-import { LOGOUT_ALL_URL, SIGNUP_URL } from '../../utils/auth/constants.js';
+import { beforeEach, describe, it, vi } from 'vitest';
 import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
-import { createFriendship } from '../../utils/relationship/query.js';
+import { insertUser } from '../../utils/user/query.js';
+import { createAccessToken } from '../../utils/auth/factory.js';
+import { searchUserRequest } from '../../utils/user/request.js';
+import { createSearchUserQuery } from '../../utils/user/factory.js';
 import {
-  expectAuthError,
   expectServerError,
   expectSuccessDataResponse,
   expectValidationError,
 } from '../../utils/common/assertion.js';
-import { signupUserInput } from '../../utils/auth/factory.js';
-import { MongoRelationshipRepository } from '../../../domain/relationship/relationship.repository.js';
-import { MongoUserRepository } from '../../../domain/user/user.repository.js';
-import { FRIEND_SEARCH_URL, USER_SEARCH_URL } from '../../utils/user/constants.js';
-import {
-  invalidFriendSearchQueries,
-  invalidSearchQueries,
-} from '../../utils/user/invalid-inputs.js';
-import { friendSearchRequest, searchUserRequest, signupAndLogin } from '../../utils/user/query.js';
-import { acceptRelationship, inviteFriend } from '../../utils/relationship/query.js';
+import { RELATIONSHIP_STATE } from '../../../domain/relationship/relationship.constants.js';
+import { invalidSearchCodeQueries } from '../../utils/user/invalid-inputs.js';
+import { insertFriendship } from '../../utils/relationship/query.js';
+import { describeAuthenticationTests } from '../../utils/common/invalid-inputs.js';
 
-describe('user search', () => {
+describe('Search User By Search Code', () => {
   beforeEach(async () => {
     await truncateAll();
+    vi.clearAllMocks();
   });
 
-  describe('success', () => {
-    it('when search code for non-existent user should return null', async () => {
-      const { accessToken } = await signupAndLogin();
-      const input = signupUserInput({});
-      await api().post(SIGNUP_URL).send(input);
-      const user = (await userModel
-        .findOne({ email: input.email })
-        .select({ searchCode: 1 })
-        .lean()
-        .exec()) as { searchCode: string };
-
-      const response = await searchUserRequest(accessToken).query({
-        q: user.searchCode.substring(0, 6) + '29',
+  describe('Success', () => {
+    it('when searching active user with no relationship should return user with NONE state', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const targetUser = await insertUser({
+        name: 'Target User',
+        imageUrl: 'https://cdn.example.com/target.png',
+        searchCode: 'AbCd1234',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
       });
 
-      expectSuccessDataResponse(response, 200, null);
-    });
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('AbCd1234'),
+      });
 
-    it('when search code for not active user should return null', async () => {
-      const { accessToken } = await signupAndLogin();
-      const input = signupUserInput({});
-      await api().post(SIGNUP_URL).send(input);
-      await userModel.updateOne({ email: input.email }, { status: 'DISABLED' });
-      const user = (await userModel
-        .findOne({ email: input.email })
-        .select({ searchCode: 1 })
-        .lean()
-        .exec()) as { searchCode: string };
-
-      const response = await searchUserRequest(accessToken).query({ q: user.searchCode });
-
-      expectSuccessDataResponse(response, 200, null);
-    });
-
-    it('when search code for active user should return user', async () => {
-      const { accessToken } = await signupAndLogin();
-      const input = signupUserInput({});
-      await api().post(SIGNUP_URL).send(input);
-      const user = (await userModel
-        .findOne({ email: input.email })
-        .select({ searchCode: 1 })
-        .lean()
-        .exec()) as { searchCode: string };
-
-      const response = await searchUserRequest(accessToken).query({ q: user.searchCode });
-
+      // Assert
       expectSuccessDataResponse(response, 200, {
         user: {
-          id: expect.any(String),
-          name: expect.any(String),
+          id: targetUser._id,
+          name: 'Target User',
+          imageUrl: 'https://cdn.example.com/target.png',
+        },
+        state: RELATIONSHIP_STATE.NONE,
+      });
+    });
+
+    it('when search code has leading and trailing whitespace should trim and return user', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const targetUser = await insertUser({
+        name: 'Trimmed Target',
+        imageUrl: null,
+        searchCode: 'Trim1234',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('  Trim1234  '),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: targetUser._id,
+          name: 'Trimmed Target',
           imageUrl: null,
         },
-        state: 'none',
+        state: RELATIONSHIP_STATE.NONE,
       });
     });
+  });
 
-    it('when searching by own search code should return self state', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      const user = await userModel.findOne({ email }).select({ searchCode: 1 });
-      expect(user).not.toBeNull();
+  describe('Validation', () => {
+    it.each(invalidSearchCodeQueries)(
+      'when $description should return bad request',
+      async ({ query, expectedDetail }) => {
+        // Arrange
+        const currentUser = await insertUser();
+        const accessToken = await createAccessToken({
+          userId: currentUser._id,
+          tokenVersion: currentUser.tokenVersion,
+        });
 
-      const response = await searchUserRequest(accessToken).query({ q: user!.searchCode });
+        // Act
+        const response = await searchUserRequest({ accessToken, query });
 
-      expect(response.body.data).toMatchObject({
-        user: { id: user!._id.toString() },
-        state: 'self',
-      });
-    });
-
-    it('when the searched user has a pending request from the current user should return invite state', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      const requester = await userModel.findOne({ email });
-      const { email: recipientEmail } = await signupAndLogin();
-      const recipient = await userModel
-        .findOne({ email: recipientEmail })
-        .select({ searchCode: 1 });
-      expect(requester).not.toBeNull();
-      expect(recipient).not.toBeNull();
-      await createFriendship(requester!._id.toString(), recipient!._id.toString(), 'PENDING');
-
-      const response = await searchUserRequest(accessToken).query({ q: recipient!.searchCode });
-
-      expect(response.body.data.state).toBe('invite');
-    });
-
-    it('when the searched user has a pending request to the current user should return recipient state', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      const recipient = await userModel.findOne({ email });
-      const { email: requesterEmail } = await signupAndLogin();
-      const requester = await userModel
-        .findOne({ email: requesterEmail })
-        .select({ searchCode: 1 });
-      expect(recipient).not.toBeNull();
-      expect(requester).not.toBeNull();
-      await createFriendship(requester!._id.toString(), recipient!._id.toString(), 'PENDING');
-
-      const response = await searchUserRequest(accessToken).query({ q: requester!.searchCode });
-
-      expect(response.body.data.state).toBe('recipient');
-    });
-
-    it('when the searched user is an accepted friend should return friend state', async () => {
-      const { accessToken, email } = await signupAndLogin();
-      const requester = await userModel.findOne({ email });
-      const { email: friendEmail } = await signupAndLogin();
-      const friend = await userModel.findOne({ email: friendEmail }).select({ searchCode: 1 });
-      expect(requester).not.toBeNull();
-      expect(friend).not.toBeNull();
-      await createFriendship(requester!._id.toString(), friend!._id.toString(), 'ACCEPTED');
-
-      const response = await searchUserRequest(accessToken).query({ q: friend!.searchCode });
-
-      expect(response.body.data.state).toBe('friend');
-    });
-
-    it.each([{ currentUserIsRequester: true }, { currentUserIsRequester: false }])(
-      'when the existing relationship is rejected should return none regardless of requester direction',
-      async ({ currentUserIsRequester }) => {
-        const { accessToken, email } = await signupAndLogin();
-        const currentUser = await userModel.findOne({ email });
-        const { email: otherEmail } = await signupAndLogin();
-        const otherUser = await userModel.findOne({ email: otherEmail }).select({ searchCode: 1 });
-        expect(currentUser).not.toBeNull();
-        expect(otherUser).not.toBeNull();
-        const requestedBy = currentUserIsRequester
-          ? currentUser!._id.toString()
-          : otherUser!._id.toString();
-        const recipient = currentUserIsRequester
-          ? otherUser!._id.toString()
-          : currentUser!._id.toString();
-        await createFriendship(requestedBy, recipient, 'REJECTED');
-
-        const response = await searchUserRequest(accessToken).query({ q: otherUser!.searchCode });
-
-        expect(response.body.data.state).toBe('none');
+        // Assert
+        expectValidationError(response, expectedDetail);
       },
     );
+  });
 
-    it('when search for friends with no friends should return empty array', async () => {
-      const { accessToken } = await signupAndLogin();
+  describeAuthenticationTests({
+    sendRequest: ({ authorizationHeader }) =>
+      searchUserRequest({
+        authorizationHeader,
+        query: createSearchUserQuery('AbCd1234'),
+      }),
+  });
 
-      const response = await friendSearchRequest(accessToken);
+  describe('Business Logic', () => {
+    it('when no user matches search code should return null', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
 
-      expectSuccessDataResponse(response, 200, []);
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('NoMatch1'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, null);
     });
 
-    it('when searching friends by name across pages should return distinct matching friends', async () => {
-      const { accessToken: ownerAccessToken, email: ownerEmail } = await signupAndLogin();
-      const owner = await userModel.findOne({ email: ownerEmail });
-      expect(owner).not.toBeNull();
-      const friends: Array<{ id: string; name: string; imageUrl: null }> = [];
+    it('when search code casing differs from stored code should return null', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      await insertUser({ searchCode: 'Case1234' });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
 
-      for (const suffix of ['A', 'B', 'C']) {
-        const { accessToken: friendAccessToken, email } = await signupAndLogin();
-        const friend = await userModel.findOneAndUpdate(
-          { email },
-          { $set: { name: `Pagination Friend ${suffix}` } },
-          { returnDocument: 'after' },
-        );
-        expect(friend).not.toBeNull();
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('case1234'),
+      });
 
-        const inviteResponse = await inviteFriend(ownerAccessToken, friend!._id.toString());
-        expect(inviteResponse.status).toBe(201);
-        const request = await friendshipModel.findOne({
-          requestedBy: owner!._id.toString(),
-          recipient: friend!._id.toString(),
-        });
-        expect(request).not.toBeNull();
-        const acceptResponse = await acceptRelationship(friendAccessToken, owner!._id.toString());
-        expect(acceptResponse.status).toBe(200);
+      // Assert
+      expectSuccessDataResponse(response, 200, null);
+    });
 
-        friends.push({
-          id: friend!._id.toString(),
-          name: friend!.name,
+    it('when target user is DISABLED should return null', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      await insertUser({ status: 'DISABLED', searchCode: 'Disa1234' });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Disa1234'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, null);
+    });
+
+    it('when searching own search code should return user with SELF state', async () => {
+      // Arrange
+      const currentUser = await insertUser({
+        name: 'Self User',
+        searchCode: 'Self1234',
+        imageUrl: null,
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Self1234'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: currentUser._id,
+          name: 'Self User',
           imageUrl: null,
+        },
+        state: RELATIONSHIP_STATE.SELF,
+      });
+    });
+
+    it('when target user is an accepted friend requested by current user should return FRIEND state', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const friend = await insertUser({ name: 'Friend A', searchCode: 'Frnd1234' });
+      await insertFriendship({
+        requestedBy: currentUser._id,
+        recipient: friend._id,
+        status: 'ACCEPTED',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Frnd1234'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: friend._id,
+          name: 'Friend A',
+          imageUrl: null,
+        },
+        state: RELATIONSHIP_STATE.FRIEND,
+      });
+    });
+
+    it('when target user is an accepted friend who invited current user should return FRIEND state', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const friend = await insertUser({ name: 'Friend B', searchCode: 'Frnd5678' });
+      await insertFriendship({
+        requestedBy: friend._id,
+        recipient: currentUser._id,
+        status: 'ACCEPTED',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Frnd5678'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: friend._id,
+          name: 'Friend B',
+          imageUrl: null,
+        },
+        state: RELATIONSHIP_STATE.FRIEND,
+      });
+    });
+
+    it('when current user has a pending outgoing invite to target should return INVITE state', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const target = await insertUser({ name: 'Invited User', searchCode: 'Invt1234' });
+      await insertFriendship({
+        requestedBy: currentUser._id,
+        recipient: target._id,
+        status: 'PENDING',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Invt1234'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: target._id,
+          name: 'Invited User',
+          imageUrl: null,
+        },
+        state: RELATIONSHIP_STATE.INVITE,
+      });
+    });
+
+    it('when target user sent a pending invite to current user should return RECIPIENT state', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const sender = await insertUser({ name: 'Sender User', searchCode: 'Recv1234' });
+      await insertFriendship({
+        requestedBy: sender._id,
+        recipient: currentUser._id,
+        status: 'PENDING',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Recv1234'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: sender._id,
+          name: 'Sender User',
+          imageUrl: null,
+        },
+        state: RELATIONSHIP_STATE.RECIPIENT,
+      });
+    });
+
+    it('when previous friend request was rejected should return NONE state', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const target = await insertUser({ name: 'Rejected User', searchCode: 'Rejt1234' });
+      await insertFriendship({
+        requestedBy: currentUser._id,
+        recipient: target._id,
+        status: 'REJECTED',
+      });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+
+      // Act
+      const response = await searchUserRequest({
+        accessToken,
+        query: createSearchUserQuery('Rejt1234'),
+      });
+
+      // Assert
+      expectSuccessDataResponse(response, 200, {
+        user: {
+          id: target._id,
+          name: 'Rejected User',
+          imageUrl: null,
+        },
+        state: RELATIONSHIP_STATE.NONE,
+      });
+    });
+  });
+
+  describe('Server Error', () => {
+    it('when user database query fails should return server error', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
+      });
+      const findOneUserSpy = vi.spyOn(userModel, 'findOne').mockImplementationOnce(() => {
+        throw new Error('User query failed');
+      });
+
+      try {
+        // Act
+        const response = await searchUserRequest({
+          accessToken,
+          query: createSearchUserQuery('AbCd1234'),
         });
+
+        // Assert
+        expectServerError(response);
+      } finally {
+        findOneUserSpy.mockRestore();
       }
+    });
 
-      const firstPage = await friendSearchRequest(ownerAccessToken).query({
-        q: 'Pagination Friend',
-        page: 1,
-        limit: 2,
+    it('when relationship database query fails should return server error', async () => {
+      // Arrange
+      const currentUser = await insertUser();
+      await insertUser({ searchCode: 'AbCd1234' });
+      const accessToken = await createAccessToken({
+        userId: currentUser._id,
+        tokenVersion: currentUser.tokenVersion,
       });
-      const secondPage = await friendSearchRequest(ownerAccessToken).query({
-        q: 'Pagination Friend',
-        page: 2,
-        limit: 2,
-      });
+      const findOneFriendshipSpy = vi
+        .spyOn(friendshipModel, 'findOne')
+        .mockImplementationOnce(() => {
+          throw new Error('Relationship query failed');
+        });
 
-      expectSuccessDataResponse(firstPage, 200, friends.slice(0, 2));
-      expectSuccessDataResponse(secondPage, 200, friends.slice(2));
-      expect(
-        firstPage.body.data.some((first: { id: string }) =>
-          secondPage.body.data.some((second: { id: string }) => second.id === first.id),
-        ),
-      ).toBe(false);
-    });
-  });
+      try {
+        // Act
+        const response = await searchUserRequest({
+          accessToken,
+          query: createSearchUserQuery('AbCd1234'),
+        });
 
-  describe('validation fail', () => {
-    it.each(invalidSearchQueries)(
-      'when search receives $description should return 400',
-      async ({ query, field }) => {
-        const { accessToken } = await signupAndLogin();
-        const response = await searchUserRequest(accessToken).query(query);
-
-        expectValidationError(response, field);
-      },
-    );
-
-    it.each(invalidFriendSearchQueries)(
-      'when friend search receives $description should return 400',
-      async ({ query, field }) => {
-        const { accessToken } = await signupAndLogin();
-        const response = await friendSearchRequest(accessToken).query(query);
-
-        expectValidationError(response, field);
-      },
-    );
-  });
-
-  describe('authentication fail', () => {
-    it('when search receives no access token should return 401', async () => {
-      const response = await api().get(USER_SEARCH_URL).query({ q: '12345678' });
-
-      expectAuthError(response, 'Missing access token');
-    });
-
-    it('when search uses a token for a non-existent user should return 401', async () => {
-      const { email, accessToken } = await signupAndLogin();
-      await userModel.deleteOne({ email });
-
-      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
-
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it('when search uses a token for an inactive user should return 401', async () => {
-      const { email, accessToken } = await signupAndLogin();
-      await userModel.updateOne({ email }, { $set: { status: 'DISABLED' } });
-
-      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
-
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it('when search uses a token with a stale token version should return 401', async () => {
-      const { accessToken, refreshCookie } = await signupAndLogin();
-      const logoutResponse = await api().post(LOGOUT_ALL_URL).set('Cookie', refreshCookie);
-      expect(logoutResponse.status).toBe(200);
-
-      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
-
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it.each([
-      {
-        description: 'no access token',
-        authorization: undefined,
-        expectedDetail: 'Missing access token',
-      },
-      {
-        description: 'an authorization header that is not Bearer type',
-        authorization: 'Basic not-a-valid-token',
-        expectedDetail: 'Missing access token',
-      },
-      {
-        description: 'an invalid Bearer token',
-        authorization: 'Bearer not-a-valid-token',
-        expectedDetail: 'Invalid refresh token',
-      },
-    ])(
-      'when friend search receives $description should return 401',
-      async ({ authorization, expectedDetail }) => {
-        const request = api().get(FRIEND_SEARCH_URL);
-        if (authorization) request.set('Authorization', authorization);
-
-        const response = await request;
-
-        expectAuthError(response, expectedDetail);
-      },
-    );
-
-    it('when friend search uses a token for a non-existent user should return 401', async () => {
-      const { email, accessToken } = await signupAndLogin();
-      await userModel.deleteOne({ email });
-
-      const response = await friendSearchRequest(accessToken);
-
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it('when friend search uses a token for an inactive user should return 401', async () => {
-      const { email, accessToken } = await signupAndLogin();
-      await userModel.updateOne({ email }, { $set: { status: 'DISABLED' } });
-
-      const response = await friendSearchRequest(accessToken);
-
-      expectAuthError(response, 'Invalid user token');
-    });
-
-    it('when friend search uses a token with a stale token version should return 401', async () => {
-      const { accessToken, refreshCookie } = await signupAndLogin();
-      const logoutResponse = await api().post(LOGOUT_ALL_URL).set('Cookie', refreshCookie);
-      expect(logoutResponse.status).toBe(200);
-
-      const response = await friendSearchRequest(accessToken);
-
-      expectAuthError(response, 'Invalid user token');
-    });
-  });
-
-  describe('server error', () => {
-    it('when user repository fails during search should return 500 with server error', async () => {
-      const { accessToken } = await signupAndLogin();
-      vi.spyOn(MongoUserRepository.prototype, 'findActiveBySearchCode').mockRejectedValue(
-        new Error('database unavailable'),
-      );
-
-      const response = await searchUserRequest(accessToken).query({ q: '12345678' });
-
-      expectServerError(response);
-    });
-
-    it('when relationship repository fails during search should return 500 with server error', async () => {
-      const { accessToken } = await signupAndLogin();
-      const { email } = await signupAndLogin();
-      const user = await userModel.findOne({ email }).select({ searchCode: 1 });
-      expect(user).not.toBeNull();
-      const relationshipRepositorySpy = vi
-        .spyOn(MongoRelationshipRepository.prototype, 'findByUsers')
-        .mockRejectedValue(new Error('database unavailable'));
-
-      const response = await searchUserRequest(accessToken).query({ q: user!.searchCode });
-
-      expectServerError(response);
-      expect(relationshipRepositorySpy).toHaveBeenCalledOnce();
-    });
-
-    it('when relationship repository fails during friend search should return 500 with server error', async () => {
-      const { accessToken } = await signupAndLogin();
-      const relationshipRepositorySpy = vi
-        .spyOn(MongoRelationshipRepository.prototype, 'findFriendsByUserId')
-        .mockRejectedValue(new Error('database unavailable'));
-
-      const response = await friendSearchRequest(accessToken);
-
-      expectServerError(response);
-      expect(relationshipRepositorySpy).toHaveBeenCalledOnce();
+        // Assert
+        expectServerError(response);
+      } finally {
+        findOneFriendshipSpy.mockRestore();
+      }
     });
   });
 });
