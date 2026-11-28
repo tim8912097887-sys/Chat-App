@@ -21,13 +21,11 @@ export const refreshTokenSchema = new Schema(
     familyId: {
       type: String,
       required: true,
-      index: true,
     },
 
     userId: {
       type: String,
       required: true,
-      index: true,
     },
 
     parentId: {

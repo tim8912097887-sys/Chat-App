@@ -14,7 +14,7 @@ export const createAccessTokenMiddleware =
     const token = bearer[1];
 
     const payload = await deps.tokenService.verifyAccessToken(token);
-    if (!payload) throw new InvalidTokenError('Invalid refresh token');
+    if (!payload) throw new InvalidTokenError('Invalid access token');
 
     req.accessToken = { ...payload };
     next();

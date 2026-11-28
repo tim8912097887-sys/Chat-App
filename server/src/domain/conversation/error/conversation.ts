@@ -23,3 +23,9 @@ export class CannotCreateDirectConversationWithSelfError extends DomainError {
     super(message);
   }
 }
+
+export class ConversationConflictError extends DomainError {
+  constructor() {
+    super('Conversation has been modified. Please refresh and try again.');
+  }
+}

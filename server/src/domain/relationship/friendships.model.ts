@@ -29,7 +29,6 @@ const friendshipSchema = new Schema(
   { collection: 'friendships', timestamps: true, versionKey: false },
 );
 
-friendshipSchema.index({ requestedBy: 1, recipient: 1 });
 friendshipSchema.index({ requestedBy: 1, status: 1, updatedAt: -1, _id: 1 });
 friendshipSchema.index({ recipient: 1, status: 1, updatedAt: -1, _id: 1 });
 

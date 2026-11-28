@@ -28,7 +28,7 @@ export class AuthController {
   };
 
   login: RequestHandler = async (req, res) => {
-    const authDto = await this.authService.login(req.body as LoginInput);
+    const authDto = await this.authService.login(req.validatedBody as LoginInput);
     this.sendTokens(res, authDto);
   };
 

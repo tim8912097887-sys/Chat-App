@@ -1,9 +1,4 @@
 import { RequestHandler } from 'express';
-import {
-  InvalidUserTokenError,
-  UserNotActiveError,
-  UserNotExistError,
-} from '../../../domain/user/error/user.js';
 import { UserRepository } from '../../../domain/user/user.repository.js';
 import { InvalidTokenError } from '../../../domain/auth/error/auth.js';
 
@@ -16,14 +11,8 @@ export const createUserValidationMiddleware =
 
     const { userId, tokenVersion } = req.accessToken;
     const user = await deps.userRepository.findById(userId);
-    if (!user) {
-      throw new UserNotExistError(userId);
-    }
-    if (user.status !== 'ACTIVE') {
-      throw new UserNotActiveError(userId);
-    }
-    if (user.tokenVersion !== tokenVersion) {
-      throw new InvalidUserTokenError('Token version conflict');
+    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== tokenVersion) {
+      throw new InvalidTokenError('Invalid token');
     }
 
     req.user = user;

@@ -19,6 +19,7 @@ import { UpdateConversationBody } from './dto/update-conversation.js';
 import { UpdateMemberRoleDto } from './dto/update-member-role.js';
 import {
   CannotCreateDirectConversationWithSelfError,
+  ConversationConflictError,
   ConversationDeletedError,
   ConversationNotFoundError,
   DirectConversationActionNotAllowedError,
@@ -27,6 +28,7 @@ import {
   CannotInviteSelfError,
   CannotKickSelfError,
   CannotLeaveAsOwnerError,
+  CannotUpdateSelfRoleError,
   MemberAlreadyExistsError,
   MemberNotFoundError,
   NotConversationMemberError,
@@ -55,6 +57,19 @@ const ROLE_HIERARCHY: Record<MemberRole, number> = {
   MEMBER: 1,
 };
 
+interface MutationFailureOptions {
+  actorId?: string;
+  allowedActorRoles?: MemberRole[];
+
+  targetMemberId?: string;
+  targetMustExist?: boolean;
+  targetMustNotExist?: boolean;
+
+  targetMustNotBeOwner?: boolean;
+  targetRoleMustDifferFrom?: MemberRole;
+  targetMustHaveLowerRoleThanActor?: boolean;
+}
+
 export class ConversationService {
   constructor(
     private readonly conversationRepository: ConversationRepository,
@@ -80,15 +95,12 @@ export class ConversationService {
         throw new UserNotActiveError('Target user is not active');
       }
 
-      const friendship = await this.relationshipRepository.findByUsers(
-        authUserId,
-        input.targetUserId,
-      );
+      const pairKey = this.buildPairKey(authUserId, input.targetUserId);
+      const friendship = await this.relationshipRepository.findByPairKey(pairKey);
       if (!friendship || friendship.status !== 'ACCEPTED') {
         throw new NotFriendError('You can only start a direct conversation with a friend');
       }
 
-      const pairKey = this.buildPairKey(authUserId, input.targetUserId);
       const { conversation } = await this.conversationRepository.createDirectConversation({
         creatorId: authUserId,
         pairKey,
@@ -183,17 +195,21 @@ export class ConversationService {
     conversationId: string,
     input: UpdateConversationBody,
   ): Promise<UpdateConversationDto> {
-    await this.validateConversationAccess(conversationId, authUserId, {
+    const { conversation } = await this.validateConversationAccess(conversationId, authUserId, {
       requireGroupType: true,
       allowedRoles: ['OWNER', 'ADMIN'],
     });
 
     const updatedConversation = await this.conversationRepository.updateGroupConversation(
       conversationId,
+      conversation.version,
       input,
     );
     if (!updatedConversation) {
-      return this.throwNotFoundOrDeleted(conversationId);
+      return this.throwMutationFailure(conversationId, {
+        actorId: authUserId,
+        allowedActorRoles: ['OWNER', 'ADMIN'],
+      });
     }
 
     const dto = UpdateConversationDto.toDomainConversationUpdated(
@@ -213,7 +229,7 @@ export class ConversationService {
     authUserId: string,
     conversationId: string,
   ): Promise<DeleteConversationDto> {
-    await this.validateConversationAccess(conversationId, authUserId, {
+    const { conversation } = await this.validateConversationAccess(conversationId, authUserId, {
       requireGroupType: true,
       allowedRoles: ['OWNER'],
     });
@@ -221,10 +237,14 @@ export class ConversationService {
     const deletedAt = new Date();
     const deletedConversation = await this.conversationRepository.softDeleteGroupConversation(
       conversationId,
+      conversation.version,
       deletedAt,
     );
     if (!deletedConversation) {
-      return this.throwNotFoundOrDeleted(conversationId);
+      return this.throwMutationFailure(conversationId, {
+        actorId: authUserId,
+        allowedActorRoles: ['OWNER'],
+      });
     }
 
     const dto = DeleteConversationDto.toDomainConversationDeleted(
@@ -245,6 +265,10 @@ export class ConversationService {
       requireGroupType: true,
       allowedRoles: ['OWNER'],
     });
+
+    if (authUserId === memberId) {
+      throw new CannotUpdateSelfRoleError();
+    }
 
     const targetUser = await this.userRepository.findById(memberId);
     if (!targetUser) {
@@ -269,11 +293,19 @@ export class ConversationService {
 
     const updatedConversation = await this.conversationRepository.updateMemberRole(
       conversationId,
+      conversation.version,
       memberId,
       input.role,
     );
     if (!updatedConversation) {
-      return this.throwNotFoundDeletedOrMissingMember(conversationId, memberId);
+      return this.throwMutationFailure(conversationId, {
+        actorId: authUserId,
+        allowedActorRoles: ['OWNER'],
+        targetMemberId: memberId,
+        targetMustExist: true,
+        targetMustNotBeOwner: true,
+        targetRoleMustDifferFrom: input.role,
+      });
     }
 
     return UpdateMemberRoleDto.toDomainMemberRoleUpdated(
@@ -306,7 +338,9 @@ export class ConversationService {
       throw new UserNotActiveError('Target user is not active');
     }
 
-    const friendship = await this.relationshipRepository.findByUsers(authUserId, input.userId);
+    const friendship = await this.relationshipRepository.findByPairKey(
+      this.buildPairKey(authUserId, input.userId),
+    );
     if (!friendship || friendship.status !== 'ACCEPTED') {
       throw new NotFriendError('You can only invite a friend to a conversation');
     }
@@ -317,24 +351,23 @@ export class ConversationService {
     }
 
     const joinedAt = new Date();
-    const updatedConversation = await this.conversationRepository.addGroupMember(conversationId, {
-      userId: input.userId,
-      role: 'MEMBER',
-      joinedAt,
-    });
+    const updatedConversation = await this.conversationRepository.addGroupMember(
+      conversationId,
+      conversation.version,
+      {
+        userId: input.userId,
+        role: 'MEMBER',
+        joinedAt,
+      },
+    );
 
     if (!updatedConversation) {
-      const latest = await this.conversationRepository.findById(conversationId);
-      if (!latest) {
-        throw new ConversationNotFoundError();
-      }
-      if (latest.deletedAt != null) {
-        throw new ConversationDeletedError();
-      }
-      if (latest.members.some((m) => m.userId === input.userId)) {
-        throw new MemberAlreadyExistsError();
-      }
-      throw new ConversationNotFoundError();
+      return this.throwMutationFailure(conversationId, {
+        actorId: authUserId,
+        allowedActorRoles: ['OWNER', 'ADMIN'],
+        targetMemberId: input.userId,
+        targetMustNotExist: true,
+      });
     }
 
     const addedMember = updatedConversation.members.find((m) => m.userId === input.userId);
@@ -355,9 +388,13 @@ export class ConversationService {
     conversationId: string,
   ): Promise<RemoveMemberDto> {
     const authUserId = authUser._id.toString();
-    const { member } = await this.validateConversationAccess(conversationId, authUserId, {
-      requireGroupType: true,
-    });
+    const { conversation, member } = await this.validateConversationAccess(
+      conversationId,
+      authUserId,
+      {
+        requireGroupType: true,
+      },
+    );
 
     if (member.role === 'OWNER') {
       throw new CannotLeaveAsOwnerError();
@@ -365,10 +402,16 @@ export class ConversationService {
 
     const updatedConversation = await this.conversationRepository.removeGroupMember(
       conversationId,
+      conversation.version,
       authUserId,
     );
     if (!updatedConversation) {
-      return this.throwNotFoundDeletedOrMissingMember(conversationId, authUserId, true);
+      return this.throwMutationFailure(conversationId, {
+        actorId: authUserId,
+        targetMemberId: authUserId,
+        targetMustExist: true,
+        targetMustNotBeOwner: true,
+      });
     }
 
     return RemoveMemberDto.toDomainMemberRemoved(
@@ -420,10 +463,18 @@ export class ConversationService {
 
     const updatedConversation = await this.conversationRepository.removeGroupMember(
       conversationId,
+      conversation.version,
       memberId,
     );
     if (!updatedConversation) {
-      return this.throwNotFoundDeletedOrMissingMember(conversationId, memberId);
+      return this.throwMutationFailure(conversationId, {
+        actorId: authUserId,
+        allowedActorRoles: ['OWNER', 'ADMIN'],
+        targetMemberId: memberId,
+        targetMustExist: true,
+        targetMustNotBeOwner: true,
+        targetMustHaveLowerRoleThanActor: true,
+      });
     }
 
     return RemoveMemberDto.toDomainMemberRemoved(
@@ -482,29 +533,76 @@ export class ConversationService {
     return [userA, userB].sort().join(':');
   }
 
-  private async throwNotFoundOrDeleted(conversationId: string): Promise<never> {
-    const latest = await this.conversationRepository.findById(conversationId);
-    if (latest && latest.deletedAt != null) {
-      throw new ConversationDeletedError();
-    }
-    throw new ConversationNotFoundError();
-  }
-
-  private async throwNotFoundDeletedOrMissingMember(
+  private async throwMutationFailure(
     conversationId: string,
-    memberId: string,
-    isSelf = false,
+    options: MutationFailureOptions = {},
   ): Promise<never> {
     const latest = await this.conversationRepository.findById(conversationId);
+
     if (!latest) {
       throw new ConversationNotFoundError();
     }
+
     if (latest.deletedAt != null) {
       throw new ConversationDeletedError();
     }
-    if (!latest.members.some((m) => m.userId === memberId)) {
-      throw isSelf ? new NotConversationMemberError() : new MemberNotFoundError();
+
+    if (latest.type !== 'GROUP') {
+      throw new DirectConversationActionNotAllowedError();
     }
-    throw new ConversationNotFoundError();
+
+    // Check actor membership and role
+    let actorMember: ChatGroupMembersDocument | undefined;
+
+    if (options.actorId) {
+      actorMember = latest.members.find((member) => member.userId === options.actorId);
+
+      if (!actorMember) {
+        throw new NotConversationMemberError();
+      }
+
+      if (options.allowedActorRoles && !options.allowedActorRoles.includes(actorMember.role)) {
+        throw new InsufficientConversationRoleError();
+      }
+    }
+
+    // Check target membership
+    let targetMember: ChatGroupMembersDocument | undefined;
+
+    if (options.targetMemberId) {
+      targetMember = latest.members.find((member) => member.userId === options.targetMemberId);
+
+      if (options.targetMustExist && !targetMember) {
+        throw new MemberNotFoundError();
+      }
+
+      if (options.targetMustNotExist && targetMember) {
+        throw new MemberAlreadyExistsError();
+      }
+
+      if (options.targetMustNotBeOwner && targetMember?.role === 'OWNER') {
+        throw new CannotChangeOwnerRoleError();
+      }
+
+      if (
+        targetMember &&
+        options.targetRoleMustDifferFrom &&
+        targetMember.role === options.targetRoleMustDifferFrom
+      ) {
+        throw new RoleUnchangedError();
+      }
+    }
+
+    if (
+      targetMember &&
+      options.targetMustHaveLowerRoleThanActor &&
+      actorMember &&
+      ROLE_HIERARCHY[actorMember.role] <= ROLE_HIERARCHY[targetMember.role]
+    ) {
+      throw new CannotKickHigherOrEqualRoleError();
+    }
+
+    // No identifiable business rule failure
+    throw new ConversationConflictError();
   }
 }

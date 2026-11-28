@@ -35,3 +35,9 @@ export class CannotKickSelfError extends DomainError {
     super(message);
   }
 }
+
+export class CannotUpdateSelfRoleError extends DomainError {
+  constructor(message = 'You cannot update role yourself in a conversation') {
+    super(message);
+  }
+}

@@ -5,12 +5,24 @@ import type { AuthRepository } from './auth.repository.js';
 import type { PasswordHasher } from './util/password-hasher.js';
 import { SignupInput } from './dto/signup.js';
 import { LoginInput } from './dto/login.js';
-import { InvalidCredentialError, InvalidTokenError, LoginLockedError } from './error/auth.js';
+import { InvalidCredentialError, InvalidTokenError } from './error/auth.js';
 import { RefreshTokenInput, TokenPayload, TokenService } from './util/token-validator.js';
 import { AuthDto, AuthTokens } from './dto/common.js';
 import { CloudinaryImageStorage, StoredImage } from './image.service.js';
 import { logger } from '../../config/logger/logger.js';
 import { PresenceService } from '../../realtime/presence.service.js';
+import { TokenRecord } from './auth.types.js';
+import { AuthSessionRepository } from './auth-session.repository.js';
+
+export interface AuthServiceDeps {
+  userService: UserService;
+  imageService: CloudinaryImageStorage;
+  authRepository: AuthRepository;
+  authSessionRepository: AuthSessionRepository;
+  tokenService: TokenService;
+  passwordHasher: PasswordHasher;
+  presenceService: PresenceService;
+}
 
 export interface AuthServiceOptions {
   maxLoginAttempts: number;
@@ -19,17 +31,27 @@ export interface AuthServiceOptions {
 }
 
 export class AuthService {
+  private readonly userService: UserService;
+  private readonly imageService: CloudinaryImageStorage;
+  private readonly authRepository: AuthRepository;
+  private readonly authSessionRepository: AuthSessionRepository;
+  private readonly tokenService: TokenService;
+  private readonly passwordHasher: PasswordHasher;
+  private readonly presenceService: PresenceService;
+  private readonly options: AuthServiceOptions;
   private dummyHash: string | undefined;
+  private readonly refreshGracePeriodMs = 5 * 60 * 1000;
 
-  constructor(
-    private readonly userService: UserService,
-    private readonly imageService: CloudinaryImageStorage,
-    private readonly authRepository: AuthRepository,
-    private readonly tokenService: TokenService,
-    private readonly passwordHasher: PasswordHasher,
-    private readonly options: AuthServiceOptions,
-    private readonly presenceService: PresenceService,
-  ) {}
+  constructor(deps: AuthServiceDeps, options: AuthServiceOptions) {
+    this.userService = deps.userService;
+    this.imageService = deps.imageService;
+    this.authRepository = deps.authRepository;
+    this.authSessionRepository = deps.authSessionRepository;
+    this.tokenService = deps.tokenService;
+    this.passwordHasher = deps.passwordHasher;
+    this.presenceService = deps.presenceService;
+    this.options = options;
+  }
 
   /**
    * Always resolves the same way whether or not the email already exists,
@@ -79,27 +101,9 @@ export class AuthService {
       throw new InvalidCredentialError('Email or password is incorrect.');
     }
 
-    const now = new Date();
-    if (user.loginLockedAt) {
-      const unlockAt = user.loginLockedAt.getTime() + this.options.lockDurationMs;
-      if (now.getTime() < unlockAt) throw new LoginLockedError('Account locked.');
-      // Lock expired: start from a clean slate.
-      await this.userService.clearLoginState(user.id);
-    }
-
     const passwordOk = await this.passwordHasher.verify(input.password, user.passwordHash);
     if (!passwordOk) {
-      const { locked } = await this.userService.registerFailedLogin(user.id, {
-        maxAttempts: this.options.maxLoginAttempts,
-        lockedAt: now,
-      });
-      throw locked
-        ? new LoginLockedError('Account locked.')
-        : new InvalidCredentialError('Email or password is incorrect.');
-    }
-
-    if (user.loginAttempt > 0 && !user.loginLockedAt) {
-      await this.userService.clearLoginState(user.id);
+      throw new InvalidCredentialError('Email or password is incorrect.');
     }
 
     const tokens = await this.issueTokens(user);
@@ -129,10 +133,7 @@ export class AuthService {
       throw new InvalidTokenError('Invalid token');
     }
     // Detect revoked or replaced tokens
-    if (
-      parent.replacedById ||
-      (parent.revokedAt && new Date().getMinutes() - parent.revokedAt.getMinutes() > 5)
-    ) {
+    if (this.isRefreshTokenReuse(parent)) {
       await this.authRepository.invalidateAllRefreshTokensByFamilyId(parent.familyId);
       throw new InvalidTokenError('Invalid token');
     }
@@ -171,8 +172,7 @@ export class AuthService {
 
   async logoutAll(token: TokenPayload): Promise<void> {
     const user = await this.requireValidSession(token);
-    await this.userService.incrementTokenVersion(user.id, token.tokenVersion);
-    await this.authRepository.invalidateAllRefreshTokensByUserId(user.id);
+    await this.authSessionRepository.revokeAllSessions(user.id, user.tokenVersion);
     this.presenceService.disconnectUser(user.id);
   }
 
@@ -223,5 +223,15 @@ export class AuthService {
   private async burnPasswordCheck(password: string): Promise<void> {
     this.dummyHash ??= await this.passwordHasher.hash(randomUUID());
     await this.passwordHasher.verify(password, this.dummyHash);
+  }
+
+  private isRefreshTokenReuse(parent: TokenRecord, now: Date = new Date()): boolean {
+    if (!parent.replacedById || !parent.revokedAt) {
+      return false;
+    }
+
+    const elapsedMs = now.getTime() - parent.revokedAt.getTime();
+
+    return elapsedMs > this.refreshGracePeriodMs;
   }
 }
