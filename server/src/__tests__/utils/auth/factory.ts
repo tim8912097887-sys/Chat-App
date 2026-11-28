@@ -1,90 +1,138 @@
 import { SignJWT } from 'jose';
 import { LoginInput } from '../../../domain/auth/dto/login.js';
 import type { SignupInput } from '../../../domain/auth/dto/signup.js';
-import { api } from '../common/app.js';
-import { LOGIN_URL, REFRESH_COOKIE_NAME, SIGNUP_URL } from './constants.js';
-import { authModel } from '../common/query.js';
 import { config } from '../../../config/env/index.js';
+import {
+  DEFAULT_USER_EMAIL,
+  DEFAULT_USER_NAME,
+  DEFAULT_USER_PASSWORD,
+  REFRESH_COOKIE_NAME,
+} from './constants.js';
+import { createHash, randomUUID } from 'crypto';
 
-export function signupUserInput(props: Partial<SignupInput> = {}): SignupInput {
-  const baseUser: SignupInput = {
-    name: 'Test User',
-    email: 'test@example.com',
-    password: 'Password123!',
-  };
-
-  if (props.name) {
-    baseUser.name = props.name.trim().toLowerCase();
-  }
-
-  if (props.email) {
-    baseUser.email = props.email.trim().toLowerCase();
-  }
-
-  if (props.password) {
-    baseUser.password = props.password.trim();
-  }
-
-  return baseUser;
-}
-
-export function loginUserInput(props: Partial<LoginInput> = {}): LoginInput {
-  const baseUser: LoginInput = {
-    email: 'test@example.com',
-    password: 'Password123!',
-  };
-
-  if (props.email) {
-    baseUser.email = props.email.trim().toLowerCase();
-  }
-
-  if (props.password) {
-    baseUser.password = props.password.trim();
-  }
-
-  return baseUser;
-}
-
-export async function createRefreshCookie(): Promise<{
-  cookie: string;
-  recordId: string;
-}> {
-  const input = signupUserInput();
-  await api().post(SIGNUP_URL).send(input);
-  const loginRes = await api()
-    .post(LOGIN_URL)
-    .send(loginUserInput({ email: input.email, password: input.password }));
-  const setCookieHeader = loginRes.headers['set-cookie'];
-  const setCookie = Array.isArray(setCookieHeader)
-    ? setCookieHeader.find((value) => value.startsWith(`${REFRESH_COOKIE_NAME}=`))
-    : setCookieHeader?.startsWith(`${REFRESH_COOKIE_NAME}=`)
-      ? setCookieHeader
-      : undefined;
-
-  if (!setCookie) {
-    throw new Error('Login response did not set a refresh token cookie');
-  }
-
-  const record = await authModel.findOne({});
-  if (!record) {
-    throw new Error('Login did not create a refresh token record');
-  }
-
+export function createSignupInput(overrides: Partial<SignupInput> = {}): SignupInput {
   return {
-    cookie: setCookie.split(';')[0]!,
-    recordId: record._id,
+    name: DEFAULT_USER_NAME,
+    email: DEFAULT_USER_EMAIL,
+    password: DEFAULT_USER_PASSWORD,
+    ...overrides,
   };
 }
 
-export async function createExpiredRefreshCookie(): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const token = await new SignJWT({ ver: 0, typ: 'refresh' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setSubject('expired-user')
-    .setIssuer(config.jwt.issuer)
-    .setIssuedAt(now - 3600)
-    .setExpirationTime(now - 1)
-    .sign(new TextEncoder().encode(config.jwt.refreshSecret));
+export function createLoginInput(overrides: Partial<LoginInput> = {}): LoginInput {
+  return {
+    email: DEFAULT_USER_EMAIL,
+    password: DEFAULT_USER_PASSWORD,
+    ...overrides,
+  };
+}
 
+export interface RefreshJwtOptions {
+  userId: string;
+  tokenVersion?: number;
+  issuedAtOffsetSeconds?: number;
+  expiresInSeconds?: number;
+  type?: 'access' | 'refresh';
+  secret?: string;
+}
+
+export async function createSignedRefreshToken(options: RefreshJwtOptions): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const issuedAt = now + (options.issuedAtOffsetSeconds ?? 0);
+  const expiresAt = now + (options.expiresInSeconds ?? 3600);
+  const secret = options.secret ?? config.jwt.refreshSecret;
+
+  const jwt = new SignJWT({
+    ver: options.tokenVersion ?? 0,
+    typ: options.type ?? 'refresh',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(options.userId)
+    .setIssuer(config.jwt.issuer)
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(expiresAt);
+
+  if ((options.type ?? 'refresh') === 'refresh') {
+    jwt.setJti(randomUUID());
+  }
+
+  return jwt.sign(new TextEncoder().encode(secret));
+}
+
+export async function createRefreshCookieHeader(options: RefreshJwtOptions): Promise<{
+  token: string;
+  tokenHash: string;
+  cookie: string;
+}> {
+  const token = await createSignedRefreshToken(options);
+  return {
+    token,
+    tokenHash: hashToken(token),
+    cookie: `${REFRESH_COOKIE_NAME}=${token}`,
+  };
+}
+
+export async function createExpiredRefreshCookie(userId = 'expired-user'): Promise<string> {
+  const token = await createSignedRefreshToken({
+    userId,
+    issuedAtOffsetSeconds: -3600,
+    expiresInSeconds: -1,
+  });
   return `${REFRESH_COOKIE_NAME}=${token}`;
+}
+
+export function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function extractCookieValue(
+  setCookieHeader: string | string[] | undefined,
+  cookieName: string,
+): string | null {
+  if (!setCookieHeader) return null;
+  const headers = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+  const target = headers.find((header) => header.startsWith(`${cookieName}=`));
+  if (!target) return null;
+  const rawPair = target.split(';')[0];
+  if (!rawPair) return null;
+  return rawPair.slice(`${cookieName}=`.length);
+}
+
+export interface AccessTokenOptions {
+  userId: string;
+  tokenVersion?: number;
+  issuedAtOffsetSeconds?: number;
+  expiresInSeconds?: number;
+  secret?: string;
+}
+
+export async function createAccessToken(options: AccessTokenOptions): Promise<string> {
+  return createSignedRefreshToken({
+    userId: options.userId,
+    tokenVersion: options.tokenVersion ?? 0,
+    issuedAtOffsetSeconds: options.issuedAtOffsetSeconds,
+    expiresInSeconds: options.expiresInSeconds ?? 900,
+    type: 'access',
+    secret: options.secret ?? config.jwt.accessSecret,
+  });
+}
+
+export async function createExpiredAccessToken(userId: string, tokenVersion = 0): Promise<string> {
+  return createAccessToken({
+    userId,
+    tokenVersion,
+    issuedAtOffsetSeconds: -3600,
+    expiresInSeconds: -1,
+  });
+}
+
+export async function createInvalidSecretAccessToken(
+  userId: string,
+  tokenVersion = 0,
+): Promise<string> {
+  return createAccessToken({
+    userId,
+    tokenVersion,
+    secret: 'invalid-test-access-secret',
+  });
 }

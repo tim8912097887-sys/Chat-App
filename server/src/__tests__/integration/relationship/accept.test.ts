@@ -1,237 +1,333 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MongoRelationshipRepository } from '../../../domain/relationship/relationship.repository.js';
-import { MongoUserRepository } from '../../../domain/user/user.repository.js';
-import { friendshipModel, truncateAll, userModel } from '../../utils/common/query.js';
-import { api, mockedRealtimePublisher } from '../../utils/common/app.js';
-import { signupAndLogin } from '../../utils/user/query.js';
-import { acceptRelationship, createPendingRequest } from '../../utils/relationship/query.js';
-import { acceptRelationshipUrl } from '../../utils/relationship/constants.js';
-import { LOGOUT_ALL_URL } from '../../utils/auth/constants.js';
+import { randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vitest } from 'vitest';
+import { friendshipModel, truncateAll } from '../../utils/common/query.js';
+import { insertUser } from '../../utils/user/query.js';
+import { DEFAULT_AVATAR_URL } from '../../utils/relationship/constants.js';
+import { findFriendshipById, insertFriendship } from '../../utils/relationship/query.js';
+import { createAccessToken } from '../../utils/auth/factory.js';
+import { acceptRelationship } from '../../utils/relationship/request.js';
 import {
-  expectAuthError,
   expectServerConflictError,
   expectServerError,
   expectSuccessMessageResponse,
   expectValidationError,
 } from '../../utils/common/assertion.js';
+import { mockedRealtimePublisher } from '../../utils/common/app.js';
 import { realtimeEventAssertion } from '../../utils/common/realtime.js';
 import { FRIEND_REQUEST_ACCEPTED_EVENT } from '../../../realtime/realtime.constants.js';
+import { invalidUpdateFriendRequestInputs } from '../../utils/relationship/invalid-inputs.js';
+import { describeAuthenticationTests } from '../../utils/common/invalid-inputs.js';
 
-describe('accept relationship', () => {
+describe('Accept Friend Request', () => {
   beforeEach(async () => {
     await truncateAll();
+    vitest.clearAllMocks();
   });
 
-  describe('success', () => {
-    it('when the recipient accepts a pending request should return 200 and mark it accepted', async () => {
-      const { recipientAccessToken, requester, requestId, recipient } =
-        await createPendingRequest();
-      const findByIdSpy = vi.spyOn(MongoUserRepository.prototype, 'findById');
+  afterEach(() => {
+    vitest.restoreAllMocks();
+  });
 
-      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
-      const relationship = await friendshipModel.findById(requestId);
+  describe('Success', () => {
+    it('when recipient accepts pending friend request should update status to accepted and publish realtime event', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com', name: 'Requester' });
+      const recipient = await insertUser({
+        email: 'recipient@example.com',
+        name: 'Recipient',
+        imageUrl: DEFAULT_AVATAR_URL,
+      });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
 
+      // Act
+      const response = await acceptRelationship(recipientToken, requester._id);
+
+      // Assert
       expectSuccessMessageResponse(response, 200, 'Friend request accepted');
-      expect(relationship?.status).toBe('ACCEPTED');
-      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(2);
+
+      const updated = await findFriendshipById(friendship._id);
+      expect(updated).toMatchObject({
+        _id: friendship._id,
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'ACCEPTED',
+      });
+
+      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
       expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledWith(
-        relationship?.requestedBy,
+        requester._id,
         realtimeEventAssertion(FRIEND_REQUEST_ACCEPTED_EVENT, {
-          requestId: relationship?._id.toString(),
+          requestId: friendship._id,
           actor: {
-            id: recipient._id.toString(),
-            name: recipient.name,
-            imageUrl: recipient.imageUrl,
+            id: recipient._id,
+            name: 'Recipient',
+            imageUrl: DEFAULT_AVATAR_URL,
           },
         }),
       );
-      expect(findByIdSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('when the recipient concurrently accepts a request twice should accept it once', async () => {
-      const { recipientAccessToken, requester, recipient, requestId } =
-        await createPendingRequest();
+    it('when recipient has no imageUrl should publish realtime event with null imageUrl', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({
+        email: 'recipient@example.com',
+        name: 'NoAvatar',
+        imageUrl: null,
+      });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
 
-      const responses = await Promise.all([
-        acceptRelationship(recipientAccessToken, requester._id.toString()),
-        acceptRelationship(recipientAccessToken, requester._id.toString()),
-      ]);
+      // Act
+      const response = await acceptRelationship(recipientToken, requester._id);
 
-      expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
-      expect(responses.find((response) => response.status === 409)?.body.error.code).toBe(
-        'ServerConflictError',
-      );
-      expect((await friendshipModel.findById(requestId))?.status).toBe('ACCEPTED');
-      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(2);
+      // Assert
+      expectSuccessMessageResponse(response, 200, 'Friend request accepted');
       expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledWith(
-        requester._id.toString(),
+        requester._id,
         realtimeEventAssertion(FRIEND_REQUEST_ACCEPTED_EVENT, {
-          requestId,
+          requestId: friendship._id,
           actor: {
-            id: recipient._id.toString(),
-            name: recipient.name,
-            imageUrl: recipient.imageUrl ?? null,
+            id: recipient._id,
+            name: 'NoAvatar',
+            imageUrl: null,
           },
         }),
       );
     });
   });
 
-  describe('validation error', () => {
-    it.each([
-      { description: 'missing requesterId', body: {} },
-      { description: 'a non-UUID requesterId', body: { requesterId: 'not-a-uuid' } },
-      {
-        description: 'a Mongo-style requesterId',
-        body: { requesterId: '507f1f77bcf86cd799439011' },
-      },
-    ])('when requesterId is $description should return 400', async ({ body }) => {
-      const { recipientAccessToken } = await createPendingRequest();
+  describe('Validation', () => {
+    it.each(invalidUpdateFriendRequestInputs)(
+      'when payload has $caseName should return bad request',
+      async ({ body, expectedDetail }) => {
+        // Arrange
+        const user = await insertUser({ email: 'user@example.com' });
+        const accessToken = await createAccessToken({ userId: user._id });
 
-      const response = await api()
-        .post(acceptRelationshipUrl)
-        .set('Authorization', `Bearer ${recipientAccessToken}`)
-        .send(body);
+        // Act
+        const response = await acceptRelationship(accessToken, undefined, { body });
 
-      expectValidationError(response, 'requesterId');
-      expect((await friendshipModel.findOne({}))?.status).toBe('PENDING');
-    });
-  });
-
-  describe('auth error', () => {
-    it.each([
-      {
-        description: 'no access token',
-        authorization: undefined,
-        expectedDetail: 'Missing access token',
-      },
-      {
-        description: 'an authorization header that is not Bearer',
-        authorization: 'Basic not-a-valid-token',
-        expectedDetail: 'Missing access token',
-      },
-      {
-        description: 'an invalid access token',
-        authorization: 'Bearer not-a-valid-token',
-        expectedDetail: 'Invalid refresh token',
-      },
-    ])(
-      'when accept receives $description should return 401',
-      async ({ authorization, expectedDetail }) => {
-        const { requester, requestId } = await createPendingRequest();
-        const request = api()
-          .post(acceptRelationshipUrl)
-          .send({ requesterId: requester._id.toString() });
-        if (authorization) request.set('Authorization', authorization);
-
-        const response = await request;
-
-        expectAuthError(response, expectedDetail);
-        expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
+        // Assert
+        expectValidationError(response, expectedDetail);
+        expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
       },
     );
+  });
 
-    it.each([
-      { description: 'has been deleted', userState: 'deleted' },
-      { description: 'is inactive', userState: 'inactive' },
-      { description: 'has a stale token version', userState: 'stale-token' },
-    ])('when the accepting user $description should return 401', async ({ userState }) => {
-      const { recipientAccessToken, recipientEmail, recipientRefreshCookie, requester, requestId } =
-        await createPendingRequest();
+  describeAuthenticationTests({
+    sendRequest: ({ authorizationHeader }) =>
+      acceptRelationship(undefined, randomUUID(), { authHeader: authorizationHeader }),
+    assertNoSideEffects: () => {
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
+    },
+  });
 
-      if (userState === 'deleted') {
-        await userModel.deleteOne({ email: recipientEmail });
-      } else if (userState === 'inactive') {
-        await userModel.updateOne({ email: recipientEmail }, { $set: { status: 'DISABLED' } });
-      } else {
-        const logoutResponse = await api()
-          .post(LOGOUT_ALL_URL)
-          .set('Cookie', recipientRefreshCookie);
-        expectSuccessMessageResponse(logoutResponse, 200, 'Logged out all sessions');
-      }
+  describe('Authorization', () => {
+    it('when unrelated third user attempts to accept friend request should return conflict', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const outsider = await insertUser({ email: 'outsider@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const outsiderToken = await createAccessToken({ userId: outsider._id });
 
-      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
+      // Act
+      const response = await acceptRelationship(outsiderToken, requester._id);
 
-      expectAuthError(response, 'Invalid user token');
-      expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
+      // Assert
+      expectServerConflictError(response, 'Friend request is not available to this user');
+      expect((await findFriendshipById(friendship._id))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
+    });
+
+    it('when original requester attempts to accept their own outgoing request should return conflict', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const requesterToken = await createAccessToken({ userId: requester._id });
+
+      // Act
+      const response = await acceptRelationship(requesterToken, recipient._id);
+
+      // Assert
+      expectServerConflictError(response, 'Friend request is not available to this user');
+      expect((await findFriendshipById(friendship._id))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
   });
 
-  describe('business logic error', () => {
-    it.each([
-      { description: 'does not exist', status: null },
-      { description: 'has already been accepted', status: 'ACCEPTED' as const },
-      { description: 'has already been rejected', status: 'REJECTED' as const },
-    ] as const)('when the request $description should return 409', async ({ status }) => {
-      const { recipientAccessToken, requester, requestId } = await createPendingRequest();
+  describe('Business Logic', () => {
+    it('when no pending friend request exists between users should return conflict', async () => {
+      // Arrange
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const otherUser = await insertUser({ email: 'other@example.com' });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
 
-      if (status) {
-        await friendshipModel.updateOne({ _id: requestId }, { $set: { status } });
-      }
+      // Act
+      const response = await acceptRelationship(recipientToken, otherUser._id);
 
-      const response = await acceptRelationship(
-        recipientAccessToken,
-        status ? requester._id.toString() : crypto.randomUUID(),
-      );
-
+      // Assert
       expectServerConflictError(response, 'Friend request is not available to this user');
-      expect(status ? (await friendshipModel.findById(requestId))?.status : null).toBe(status);
-      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
 
-    it('when a user outside the relationship tries to accept should return 409', async () => {
-      const { recipient, requester, requestId } = await createPendingRequest();
-      const { accessToken: otherUserAccessToken } = await signupAndLogin();
-      expect(await userModel.countDocuments()).toBe(3);
+    it('when user attempts to accept request with own userId as requesterId should return conflict', async () => {
+      // Arrange
+      const user = await insertUser({ email: 'self@example.com' });
+      const accessToken = await createAccessToken({ userId: user._id });
 
-      const response = await acceptRelationship(otherUserAccessToken, requester._id.toString());
+      // Act
+      const response = await acceptRelationship(accessToken, user._id);
 
+      // Assert
       expectServerConflictError(response, 'Friend request is not available to this user');
-      expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
-      expect((await friendshipModel.findById(requestId))?.recipient).toBe(
-        recipient._id.toString(),
-      );
-      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
 
-    it('when the requester tries to accept should return 409 without changing status', async () => {
-      const { requesterAccessToken, requester, requestId } = await createPendingRequest();
+    it('when friend request is already accepted should return conflict', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'ACCEPTED',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
 
-      const response = await acceptRelationship(requesterAccessToken, requester._id.toString());
+      // Act
+      const response = await acceptRelationship(recipientToken, requester._id);
 
+      // Assert
       expectServerConflictError(response, 'Friend request is not available to this user');
-      expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
-      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
+      expect((await findFriendshipById(friendship._id))?.status).toBe('ACCEPTED');
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
 
-    it('when the pending status update loses a race should return 409 and keep the status unchanged', async () => {
-      const { recipientAccessToken, requester, requestId } = await createPendingRequest();
-      vi.spyOn(
-        MongoRelationshipRepository.prototype,
-        'updatePendingRequestStatus',
-      ).mockResolvedValue(false);
+    it('when friend request was previously rejected should return conflict', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'REJECTED',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
 
-      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
+      // Act
+      const response = await acceptRelationship(recipientToken, requester._id);
 
-      expectServerConflictError(response, 'Friend request is no longer pending');
-      expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
+      // Assert
+      expectServerConflictError(response, 'Friend request is not available to this user');
+      expect((await findFriendshipById(friendship._id))?.status).toBe('REJECTED');
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Concurrency', () => {
+    it('when recipient sends concurrent accept requests for same pending request only one should succeed', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
+
+      // Act
+      const responses = await Promise.all([
+        acceptRelationship(recipientToken, requester._id),
+        acceptRelationship(recipientToken, requester._id),
+      ]);
+
+      // Assert
+      const successes = responses.filter((r) => r.status === 200);
+      const conflicts = responses.filter((r) => r.status === 409);
+
+      expect(successes).toHaveLength(1);
+      expect(conflicts).toHaveLength(1);
+      expectSuccessMessageResponse(successes[0], 200, 'Friend request accepted');
+      expectServerConflictError(conflicts[0], '');
+
+      const stored = await findFriendshipById(friendship._id);
+      expect(stored?.status).toBe('ACCEPTED');
       expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('server error', () => {
-    it('when updating the relationship fails should return 500 and leave it pending', async () => {
-      const { recipientAccessToken, requester, requestId } = await createPendingRequest();
-      const updatePendingRequestStatus = vi
-        .spyOn(MongoRelationshipRepository.prototype, 'updatePendingRequestStatus')
-        .mockRejectedValue(new Error('database unavailable'));
+  describe('Server Error', () => {
+    it('when database fails while finding pending request should return server error', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
+      vitest.spyOn(friendshipModel, 'findOne').mockImplementationOnce(
+        () =>
+          ({
+            exec: vitest.fn().mockRejectedValue(new Error('DB findOne failed')),
+          }) as unknown as ReturnType<typeof friendshipModel.findOne>,
+      );
 
-      const response = await acceptRelationship(recipientAccessToken, requester._id.toString());
+      // Act
+      const response = await acceptRelationship(recipientToken, requester._id);
 
+      // Assert
       expectServerError(response);
-      expect(updatePendingRequestStatus).toHaveBeenCalledOnce();
-      expect((await friendshipModel.findById(requestId))?.status).toBe('PENDING');
-      expect(mockedRealtimePublisher.publishToUser).toHaveBeenCalledTimes(1);
+      expect((await findFriendshipById(friendship._id))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
+    });
+
+    it('when database fails while updating pending request status should return server error', async () => {
+      // Arrange
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const recipient = await insertUser({ email: 'recipient@example.com' });
+      const friendship = await insertFriendship({
+        requestedBy: requester._id,
+        recipient: recipient._id,
+        status: 'PENDING',
+      });
+      const recipientToken = await createAccessToken({ userId: recipient._id });
+      vitest.spyOn(friendshipModel, 'updateOne').mockImplementationOnce(
+        () =>
+          ({
+            exec: vitest.fn().mockRejectedValue(new Error('DB updateOne failed')),
+          }) as unknown as ReturnType<typeof friendshipModel.updateOne>,
+      );
+
+      // Act
+      const response = await acceptRelationship(recipientToken, requester._id);
+
+      // Assert
+      expectServerError(response);
+      expect((await findFriendshipById(friendship._id))?.status).toBe('PENDING');
+      expect(mockedRealtimePublisher.publishToUser).not.toHaveBeenCalled();
     });
   });
 });
